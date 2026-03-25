@@ -1,3 +1,99 @@
+Markdown
+# Desafio Técnico: Sistema de Votação
+
+Este repositório contém a solução para o desafio de gerenciamento de sessões de votação em assembleias cooperativas.
+
+---
+
+## 🏗️ Arquitetura e Decisões Técnicas
+
+Para este projeto, optei pela **Arquitetura Hexagonal (Ports and Adapters)**. Esta escolha foi feita para garantir:
+
+* **Independência de Framework:** O coração da aplicação (Regras de Negócio) é isolado de detalhes de infraestrutura como o Spring Boot ou o banco de dados H2.
+* **Facilidade de Testes:** A separação permite testar o domínio sem a necessidade de subir o contexto completo do Spring.
+* **Manutenibilidade:** Segue os princípios **SOLID**, facilitando a expansão do sistema (como a futura integração com sistemas externos de CPF).
+
+## 🚀 Como Executar a Aplicação
+
+* **Pré-requisitos:** Java 17+ e Maven instalados.
+* **Clone o repositório:** `git clone [URL_DO_SEU_REPO]`
+* **Execute via Terminal:**
+```bash
+mvn spring-boot:run
+Acesse a API: A aplicação estará disponível em http://localhost:8080.
+
+📌 Versionamento da API (Tarefa Bônus 3)
+Utilizei a estratégia de Versionamento pela URL (ex: /v1/pautas).
+
+Por que? É a abordagem mais clara para o cliente mobile (como citado no Anexo 1 do desafio), permitindo que versões diferentes da API coexistam durante períodos de transição sem quebrar dispositivos que ainda não atualizaram o aplicativo.
+
+🗄️ Acesso ao Banco de Dados (H2 Console)
+Para validar se os dados (Pautas, Sessões e Votos) estão sendo gravados corretamente:
+
+URL: http://localhost:8080/h2-console
+
+JDBC URL: jdbc:h2:mem:testdb
+
+User: sa
+
+Password: (em branco)
+
+🗳️ Regras de Negócio do Voto
+O sistema impede ações que quebrem a integridade da votação:
+
+Sessão Encerrada: Não é possível votar se o tempo da sessão já expirou.
+
+Voto Duplicado: O mesmo associadoId não pode votar duas vezes na mesma pauta.
+
+ID Inexistente: O sistema valida se a pauta informada realmente existe antes de processar o voto.
+
+🛠️ Solução de Problemas (Troubleshooting)
+Erro: "Pauta não encontrada" (500 Internal Server Error)
+Como o banco de dados é em memória (H2), os dados são apagados sempre que a aplicação é reiniciada.
+
+Certifique-se de:
+
+Executar o POST de criação de pauta antes de tentar abrir uma sessão.
+
+Verificar no log do console qual foi o ID gerado para a pauta (ex: ID 1, 2...).
+
+Usar esse ID correto na URL de abertura de sessão: /v1/pautas/{ID}/abrir.
+
+
+
+🧪 Roteiro de Teste de Ponta a Ponta (End-to-End)
+Abra o seu arquivo src/testes.http e execute nesta ordem exata:
+
+1. O Fluxo de Sucesso (Happy Path)
+Criar Pauta: POST /v1/pautas -> Deve retornar 201 Created e o ID 1.
+
+Abrir Sessão: POST /v1/pautas/1/abrir?minutos=1 -> Deve retornar 200 OK.
+
+Voto 1 (Sim): POST /v1/pautas/1/votos (Associado "A") -> Deve retornar 200 OK.
+
+Voto 2 (Não): POST /v1/pautas/1/votos (Associado "B") -> Deve retornar 200 OK.
+
+Resultado: GET /v1/pautas/1/resultado -> Deve mostrar:
+
+totalVotos: 2
+
+totalSim: 1
+
+totalNao: 1
+
+vencedor: "EMPATE" (ou conforme a lógica que o orquestrador implementou).
+
+2. Teste de Resiliência (Edge Cases)
+Duplicidade: Tente votar de novo com o Associado "A" na pauta 1. -> Esperado: Erro (400 ou RuntimeException).
+
+Pauta Inexistente: Tente abrir sessão para a Pauta 99. -> Esperado: Erro "Pauta não encontrada".
+
+Sessão Expirada: Aguarde 1 minuto e tente votar com o Associado "C". -> Esperado: Erro "Sessão encerrada".
+
+
+
+---
+
 # Votação
 
 ## Objetivo
@@ -115,3 +211,4 @@ A tela do tipo SELECAO exibe uma lista de opções para que o usuário.
 O aplicativo envia uma requisição POST para a url informada e com o body definido pelo objeto dentro de cada item da lista de seleção, quando o mesmo é acionado, semelhando ao funcionamento dos botões da tela FORMULARIO.
 
 # desafio-votacao
+

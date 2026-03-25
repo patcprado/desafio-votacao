@@ -1,0 +1,59 @@
+### Criar uma nova Pauta
+POST http://localhost:8080/v1/pautas
+Content-Type: application/json
+
+{
+  "titulo": "Votação Prazo",
+  "descricao": "Votação para decidir o prazo da entrega"
+}
+
+### Listar todas as Pautas
+GET http://localhost:8080/v1/pautas
+
+### Abrir Sessão para a Pauta 1 (Padrão 1 min)
+POST http://localhost:8080/v1/pautas/1/abrir
+
+### Abrir Sessão para a Pauta 1 (Duração 5 min)
+POST http://localhost:8080/v1/pautas/1/abrir?minutos=5
+
+
+### Voto 1 - SIM (Associado A)
+POST http://localhost:8080/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "USER-001", "escolha": "SIM" }
+
+### Voto 2 - SIM (Associado B)
+POST http://localhost:8080/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "USER-002", "escolha": "SIM" }
+
+### Voto 3 - NAO (Associado C)
+POST http://localhost:8080/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "USER-003", "escolha": "NAO" }
+
+### Voto 4 - NAO (Associado D)
+POST http://localhost:8080/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "USER-004", "escolha": "NAO" }
+
+### Voto 5 - NAO (Associado E)
+POST http://localhost:8080/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "USER-005", "escolha": "NAO" }
+
+### Voto 6 - NAO (Associado E)
+POST http://localhost:8080/v1/pautas/1/votos
+Content-Type: application/json
+
+{ "associadoId": "USER-006", "escolha": "NAO" }
+
+
+### Obter Resultado da Votação
+GET http://localhost:8080/v1/pautas/1/resultado
+Accept: application/json
