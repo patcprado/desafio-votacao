@@ -19,7 +19,10 @@ public class VotoPersistenceAdapter implements VotoRepositoryPort {
     public Voto salvar(Voto voto) {
         VotoEntity entity = new VotoEntity();
         entity.setPautaId(voto.getPautaId());
-        entity.setAssociadoId(voto.getAssociadoId());
+
+        String cpfNumerico = voto.getAssociadoId().replaceAll("\\D", "");
+        entity.setAssociadoId(cpfNumerico);
+
         entity.setEscolha(voto.getEscolha());
 
         VotoEntity salvo = jpaRepository.save(entity);

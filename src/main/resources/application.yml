@@ -1,0 +1,68 @@
+logging:
+  level:
+    com.dbserver.votacao: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
+
+spring:
+  profiles:
+    active: dev # Default para desenvolvimento local
+
+  jpa:
+    open-in-view: false # Boa prática de performance: evita conexões abertas desnecessariamente
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc.batch_size: 50 # Bônus 2: Melhora performance em inserções em massa
+        order_inserts: true
+        
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+app:
+  external:
+    user-validation:
+      url: https://api.votacao.com
+
+---
+# Profile de Desenvolvimento (Postgres Docker)
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://localhost:5432/votacao_db
+    username: admin
+    password: admin
+    driver-class-name: org.postgresql.Driver
+
+---
+# Profile de Teste (H2 in-memory)
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop # Para testes, o H2 pode recriar tudo do zero

@@ -8,5 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface SessaoJpaRepository extends JpaRepository<SessaoEntity, Long> {
-    Optional<SessaoEntity> findByPautaId(Long pautaId);
+    Optional<SessaoEntity> findFirstByPautaIdOrderByIdDesc(Long pautaId);
 }

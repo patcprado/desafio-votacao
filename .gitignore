@@ -1,18 +1,45 @@
-# Java / Maven
+# --- Compilação Java/Maven ---
 target/
-*.class
-*.jar
-*.war
-*.ear
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
 
-# Virtual Machine Crash Logs
+# --- IntelliJ IDEA ---
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+# Exceção: se você quiser compartilhar os runConfigurations,
+# mas geralmente em Sênior a gente ignora tudo.
+
+# --- Logs e Crashes ---
+*.log
+logs/
 hs_err_pid*
+replay_pid*
 
-# VS Code
+# --- Docker & Local Data ---
+postgres_data/
+.docker/
+
+# --- Configurações Sensíveis ---
+.env
+*.jks
+*.p12
+*.key
+
+# --- Sistemas Operacionais ---
+.DS_Store
+Thumbs.db
+
+# --- VS Code ---
 .vscode/
 .history/
 *.code-workspace
-
-# Banco de Dados H2 Local (se gerar arquivo)
-*.mv.db
-*.trace.db

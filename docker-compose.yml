@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: votacao-db
+    environment:
+      POSTGRES_DB: db_votacao
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # <--- Aqui a mágica acontece
+
+  app:
+    build: .
+    container_name: votacao-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/db_votacao
+    depends_on:
+      - db
+
+# Define o volume nomeado para o Docker gerenciar
+volumes:
+  postgres_data:

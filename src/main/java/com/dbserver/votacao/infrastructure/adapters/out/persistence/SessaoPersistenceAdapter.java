@@ -32,7 +32,7 @@ public class SessaoPersistenceAdapter implements SessaoRepositoryPort {
 
     @Override
     public Optional<Sessao> buscarPorPautaId(Long pautaId) {
-        return jpaRepository.findByPautaId(pautaId)
+        return jpaRepository.findFirstByPautaIdOrderByIdDesc(pautaId)
                 .map(entity -> new Sessao(
                         entity.getId(),
                         entity.getPautaId(),

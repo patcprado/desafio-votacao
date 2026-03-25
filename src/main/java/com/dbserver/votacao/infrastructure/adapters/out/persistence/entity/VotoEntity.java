@@ -2,26 +2,29 @@ package com.dbserver.votacao.infrastructure.adapters.out.persistence.entity;
 
 import com.dbserver.votacao.domain.model.EscolhaVoto;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
-@Table(name = "votos")
 @Getter
 @Setter
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@Table(name = "votos")
 public class VotoEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "pauta_id", nullable = false)
     private Long pautaId;
 
-    @Column(nullable = false)
+    @Column(name = "cpf", nullable = false, length = 11)
     private String associadoId;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "voto", nullable = false)
     private EscolhaVoto escolha;
 }

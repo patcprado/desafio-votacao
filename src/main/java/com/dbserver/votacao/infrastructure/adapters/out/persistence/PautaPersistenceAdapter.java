@@ -31,13 +31,16 @@ public class PautaPersistenceAdapter implements PautaRepositoryPort {
 
     @Override
     public Optional<Pauta> buscarPorId(Long id) {
+        if (id == null) {
+            return Optional.empty();
+        }
         return jpaRepository.findById(id)
                 .map(entity -> {
                     Pauta pauta = new Pauta();
                     pauta.setId(entity.getId());
                     pauta.setTitulo(entity.getTitulo());
                     pauta.setDescricao(entity.getDescricao());
-                    return pauta;
+                    return pauta; // <--- O "return" que faltava para o Maven compilar!
                 });
     }
 

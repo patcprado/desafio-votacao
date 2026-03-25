@@ -1,96 +1,90 @@
 Markdown
-# Desafio Técnico: Sistema de Votação
 
-Este repositório contém a solução para o desafio de gerenciamento de sessões de votação em assembleias cooperativas.
+# 🗳️ Desafio Técnico: Sistema de Votação (DBServer)
+
+Este repositório contém uma solução robusta e escalável para o gerenciamento de sessões de votação em assembleias cooperativas, desenvolvida como parte do desafio técnico da DBServer.
 
 ---
 
 ## 🏗️ Arquitetura e Decisões Técnicas
 
-Para este projeto, optei pela **Arquitetura Hexagonal (Ports and Adapters)**. Esta escolha foi feita para garantir:
+A aplicação foi construída utilizando **Arquitetura Hexagonal (Ports and Adapters)**. Esta escolha estratégica visa:
 
-* **Independência de Framework:** O coração da aplicação (Regras de Negócio) é isolado de detalhes de infraestrutura como o Spring Boot ou o banco de dados H2.
-* **Facilidade de Testes:** A separação permite testar o domínio sem a necessidade de subir o contexto completo do Spring.
-* **Manutenibilidade:** Segue os princípios **SOLID**, facilitando a expansão do sistema (como a futura integração com sistemas externos de CPF).
+* **Independência de Framework:** O "Core" da aplicação (Regras de Negócio) é isolado, facilitando manutenções e trocas de tecnologia de infraestrutura.
+* **Domínio Rico:** As regras de validação de votos e sessões estão centralizadas no domínio, seguindo os princípios **SOLID**.
+* **Testabilidade:** A separação clara permite testes unitários de alta performance e testes de integração focados.
 
-## 🚀 Como Executar a Aplicação
+---
 
-* **Pré-requisitos:** Java 17+ e Maven instalados.
-* **Clone o repositório:** `git clone [URL_DO_SEU_REPO]`
-* **Execute via Terminal:**
-```bash
-mvn spring-boot:run
-Acesse a API: A aplicação estará disponível em http://localhost:8080.
+## 📖 Documentação da API (Swagger)
 
-📌 Versionamento da API (Tarefa Bônus 3)
-Utilizei a estratégia de Versionamento pela URL (ex: /v1/pautas).
+A API utiliza o **SpringDoc OpenAPI** para gerar documentação interativa. 
 
-Por que? É a abordagem mais clara para o cliente mobile (como citado no Anexo 1 do desafio), permitindo que versões diferentes da API coexistam durante períodos de transição sem quebrar dispositivos que ainda não atualizaram o aplicativo.
+🔗 **Acesse aqui:** [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
-🗄️ Acesso ao Banco de Dados (H2 Console)
-Para validar se os dados (Pautas, Sessões e Votos) estão sendo gravados corretamente:
+### 📸 Visualização da Interface
+> *Dica: Insira aqui o print que você tirou da tela do Swagger.*
 
-URL: http://localhost:8080/h2-console
+---
 
-JDBC URL: jdbc:h2:mem:testdb
+## 🛠️ Tecnologias Utilizadas
 
-User: sa
+* **Java 21** & **Spring Boot 3**
+* **Spring Data JPA** (Persistência com H2 em memória)
+* **Bean Validation** (Validação de contratos)
+* **SpringDoc OpenAPI** (Documentação v3)
+* **Maven** (Gerenciador de dependências)
 
-Password: (em branco)
+---
 
-🗳️ Regras de Negócio do Voto
-O sistema impede ações que quebrem a integridade da votação:
+## 🚀 Como Executar o Projeto
 
-Sessão Encerrada: Não é possível votar se o tempo da sessão já expirou.
+1.  **Pré-requisitos:** Certifique-se de ter o **JDK 21** instalado.
+2.  **Clone o repositório:**
+    ```bash
+    git clone [https://github.com/patcprado/desafio-votacao.git](https://github.com/patcprado/desafio-votacao.git)
+    ```
+3.  **Execute via Terminal:**
+    ```bash
+    ./mvnw spring-boot:run
+    ```
+4.  A API estará disponível em `http://localhost:8080`.
 
-Voto Duplicado: O mesmo associadoId não pode votar duas vezes na mesma pauta.
+---
 
-ID Inexistente: O sistema valida se a pauta informada realmente existe antes de processar o voto.
+## 📌 Detalhes de Implementação
 
-🛠️ Solução de Problemas (Troubleshooting)
-Erro: "Pauta não encontrada" (500 Internal Server Error)
-Como o banco de dados é em memória (H2), os dados são apagados sempre que a aplicação é reiniciada.
+### Versionamento da API
+Utilizei a estratégia de **Versionamento pela URL** (ex: `/v1/pautas`).
+* **Motivo:** É a abordagem mais clara para clientes mobile, permitindo que versões diferentes coexistam durante transições sem quebrar dispositivos que ainda não atualizaram o app.
 
-Certifique-se de:
+### Regras de Negócio Implementadas
+* **Sessão Expirada:** Bloqueio automático de votos após o tempo definido (default 1 min).
+* **Voto Único:** O sistema impede que o mesmo `associadoId` vote mais de uma vez na mesma pauta.
+* **Integridade:** Validação de existência de pautas antes da abertura de sessões.
 
-Executar o POST de criação de pauta antes de tentar abrir uma sessão.
+### Banco de Dados (H2 Console)
+Para visualizar as tabelas em tempo real:
+* **URL:** [http://localhost:8080/h2-console](http://localhost:8080/h2-console)
+* **JDBC URL:** `jdbc:h2:mem:testdb`
+* **User:** `sa` | **Password:** *(em branco)*
 
-Verificar no log do console qual foi o ID gerado para a pauta (ex: ID 1, 2...).
+---
 
-Usar esse ID correto na URL de abertura de sessão: /v1/pautas/{ID}/abrir.
+## 🧪 Roteiro de Teste (Happy Path)
 
+Para testar o fluxo completo, você pode usar o arquivo `src/testes.http` ou o Swagger:
 
+1.  **Criar Pauta:** `POST /v1/pautas` (Gera ID 1).
+2.  **Abrir Sessão:** `POST /v1/pautas/1/abrir?minutos=1`.
+3.  **Votar (Sim):** `POST /v1/pautas/1/votos` (Associado A).
+4.  **Votar (Não):** `POST /v1/pautas/1/votos` (Associado B).
+5.  **Resultado:** `GET /v1/pautas/1/resultado` -> Deve retornar a contabilização e o vencedor.
 
-🧪 Roteiro de Teste de Ponta a Ponta (End-to-End)
-Abra o seu arquivo src/testes.http e execute nesta ordem exata:
+---
 
-1. O Fluxo de Sucesso (Happy Path)
-Criar Pauta: POST /v1/pautas -> Deve retornar 201 Created e o ID 1.
-
-Abrir Sessão: POST /v1/pautas/1/abrir?minutos=1 -> Deve retornar 200 OK.
-
-Voto 1 (Sim): POST /v1/pautas/1/votos (Associado "A") -> Deve retornar 200 OK.
-
-Voto 2 (Não): POST /v1/pautas/1/votos (Associado "B") -> Deve retornar 200 OK.
-
-Resultado: GET /v1/pautas/1/resultado -> Deve mostrar:
-
-totalVotos: 2
-
-totalSim: 1
-
-totalNao: 1
-
-vencedor: "EMPATE" (ou conforme a lógica que o orquestrador implementou).
-
-2. Teste de Resiliência (Edge Cases)
-Duplicidade: Tente votar de novo com o Associado "A" na pauta 1. -> Esperado: Erro (400 ou RuntimeException).
-
-Pauta Inexistente: Tente abrir sessão para a Pauta 99. -> Esperado: Erro "Pauta não encontrada".
-
-Sessão Expirada: Aguarde 1 minuto e tente votar com o Associado "C". -> Esperado: Erro "Sessão encerrada".
-
-
+## 📝 Autor
+**Patricia Campos** - Senior Back-end Developer
 
 ---
 
