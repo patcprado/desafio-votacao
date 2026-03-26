@@ -6,6 +6,7 @@ import com.dbserver.votacao.infrastructure.adapters.out.persistence.entity.Sessa
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -40,4 +41,14 @@ public class SessaoPersistenceAdapter implements SessaoRepositoryPort {
                         entity.getDataEncerramento()));
     }
 
+    @Override
+    public List<Sessao> listarTodas() {
+        return jpaRepository.findAll().stream()
+                .map(entity -> new Sessao(
+                        entity.getId(),
+                        entity.getPautaId(),
+                        entity.getDataAbertura(),
+                        entity.getDataEncerramento()))
+                .toList();
+    }
 }

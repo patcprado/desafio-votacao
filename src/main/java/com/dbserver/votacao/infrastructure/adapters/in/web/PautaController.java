@@ -3,10 +3,12 @@ package com.dbserver.votacao.infrastructure.adapters.in.web;
 import com.dbserver.votacao.application.services.PautaService;
 import com.dbserver.votacao.domain.model.Pauta;
 import com.dbserver.votacao.domain.model.ResultadoPauta;
+import com.dbserver.votacao.domain.model.Sessao;
 import com.dbserver.votacao.domain.model.Voto;
 import com.dbserver.votacao.infrastructure.adapters.in.web.dto.PautaRequest;
 import com.dbserver.votacao.infrastructure.adapters.in.web.dto.VotoRequest;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.GlobalExceptionHandler.ErrorDetails;
+import com.dbserver.votacao.infrastructure.adapters.out.persistence.SessaoPersistenceAdapter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -29,6 +31,8 @@ import java.util.List;
 public class PautaController {
 
     private final PautaService pautaService;
+    private final SessaoPersistenceAdapter sessionAdapter;
+
 
     @Operation(summary = "Criar uma nova pauta", description = "Cadastra uma pauta no sistema para posterior votação.")
     @ApiResponses(value = {
@@ -92,4 +96,15 @@ public class PautaController {
             @Parameter(description = "ID da pauta") @PathVariable Long id) {
         return ResponseEntity.ok(pautaService.obterResultado(id));
     }
+
+    @Operation(summary = "Listar todas as sessões (Debug/Auditoria)",
+            description = "Retorna o histórico de todas as sessões abertas, datas de encerramento e pautas vinculadas.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lista de sessões obtida com sucesso")
+    })
+    @GetMapping("/sessoes")
+    public ResponseEntity<List<Sessao>> listarSessoes() {
+        return ResponseEntity.ok(sessionAdapter.listarTodas());
+    }
+
 }

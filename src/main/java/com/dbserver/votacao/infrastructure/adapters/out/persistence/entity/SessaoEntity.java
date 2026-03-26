@@ -15,11 +15,11 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Data
 public class SessaoEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "pauta_id")
     private Long pautaId;
     private LocalDateTime dataAbertura;
     @Column(name = "data_fechamento")

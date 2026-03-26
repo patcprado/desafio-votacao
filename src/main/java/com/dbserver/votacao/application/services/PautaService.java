@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,6 +36,7 @@ public class PautaService {
         return pautaRepository.listarTodas();
     }
 
+    @Transactional
     public void abrirSessao(Long pautaId, Integer minutos) {
         log.info("M=abrirSessao, status=START, pautaId={}", pautaId);
 
@@ -60,18 +63,11 @@ public class PautaService {
     public void receberVoto(Long pautaId, Voto voto) {
         log.info("M=receberVoto, status=START, pautaId={}, associadoId={}", pautaId, voto.getAssociadoId());
 
-        if (voto.getAssociadoId() != null && voto.getAssociadoId().matches(".*[a-zA-Z].*")) {
-             throw new RuntimeException("CPF deve conter apenas números");
-        }
-
-        String cpfLimpo = voto.getAssociadoId().replaceAll("\\D", "");
+        // 1. Limpeza e Formatação
+        String cpfLimpo = validarELimparCpf(voto.getAssociadoId());
         voto.setAssociadoId(cpfLimpo);
 
-        // 1. Pauta existe?
-        pautaRepository.buscarPorId(pautaId)
-                .orElseThrow(() -> new RuntimeException("Pauta não encontrada"));
-
-        // 2. Sessão está aberta?
+        // 2. Validação de Sessão (Regra de Negócio Crítica)
         Sessao sessao = sessaoRepository.buscarPorPautaId(pautaId)
                 .orElseThrow(() -> new RuntimeException("Sessão não encontrada para esta pauta"));
 
@@ -79,27 +75,35 @@ public class PautaService {
             throw new RuntimeException("A sessão para esta pauta já está encerrada");
         }
 
-        if (!cpfValidationPort.isAbleToVote(voto.getAssociadoId())) {
+        // 3. Validação Externa (CPF Inapto)
+        if (!cpfValidationPort.isAbleToVote(cpfLimpo)) {
             throw new RuntimeException("Associado não autorizado para votar (CPF inválido ou inapto)");
         }
 
-        // 3. Associado já votou? (Aqui você já limpou o caminho)
-        if (votoRepository.existeVotoPorPautaEAssociado(pautaId, voto.getAssociadoId())) {
-            throw new RuntimeException("Associado já votou nesta pauta");
-        }
-
-        // 4. Salvar voto
+        // 4. Salvar Voto (A Unique Constraint no banco garante a unicidade aqui)
         voto.setPautaId(pautaId);
         votoRepository.salvar(voto);
 
-        // Métrica customizada para o Item 1 (Monitoramento)
+        // 5. Métrica e Log de Sucesso
+        incrementarMetricaVoto(pautaId, voto.getEscolha());
+        log.info("M=receberVoto, status=SUCCESS, pautaId={}, associadoId={}", pautaId, cpfLimpo);
+    }
+
+    private void incrementarMetricaVoto(Long pautaId, EscolhaVoto escolha) {
         meterRegistry.counter("votacao_votos_total",
                         "pautaId", pautaId.toString(),
-                        "escolha", voto.getEscolha().name())
+                        "escolha", escolha.name())
                 .increment();
-
-        log.info("M=receberVoto, status=SUCCESS, pautaId={}, associadoId={}", pautaId, voto.getAssociadoId());
     }
+
+    // Método auxiliar para deixar o código principal limpo
+    private String validarELimparCpf(String cpf) {
+        if (cpf == null || cpf.matches(".*[a-zA-Z].*")) {
+            throw new RuntimeException("CPF deve conter apenas números");
+        }
+        return cpf.replaceAll("\\D", "");
+    }
+    
     public ResultadoPauta obterResultado(Long pautaId) {
         log.info("M=obterResultado, status=START, pautaId={}", pautaId);
 

@@ -18,10 +18,7 @@ public class VotoEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "pauta_id", nullable = false)
     private Long pautaId;
-
-    @Column(name = "cpf", nullable = false, length = 11)
     private String associadoId;
 
     @Enumerated(EnumType.STRING)

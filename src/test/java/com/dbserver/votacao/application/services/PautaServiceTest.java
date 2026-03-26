@@ -158,48 +158,47 @@ class PautaServiceTest {
         verify(sessaoRepository, never()).salvar(any());
     }
 
-    // 3. Receber Voto
     @Test
     void deveReceberVotoComSucesso() {
+        // GIVEN
         Long pautaId = 1L;
-        Voto voto = new Voto(null, pautaId, "12345678901", EscolhaVoto.SIM);
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-        // Sessão ativa
+        String cpf = "12345678901";
+        Voto voto = new Voto(null, pautaId, cpf, EscolhaVoto.SIM);
+
+        // Sessão ativa (Esta chamada ainda existe no Service)
         Sessao sessaoAtiva = new Sessao(1L, pautaId, LocalDateTime.now().minusMinutes(1),
                 LocalDateTime.now().plusMinutes(10));
 
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
+        // REMOVIDO: pautaRepository.buscarPorId (o Service não chama mais)
+        // REMOVIDO: votoRepository.existeVotoPorPautaEAssociado (o Service não chama mais)
+
+        // MANTIDO: O Service ainda chama a sessão e a validação de CPF
         when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAtiva));
-        when(votoRepository.existeVotoPorPautaEAssociado(pautaId, "12345678901")).thenReturn(false);
-        when(cpfValidationPort.isAbleToVote(anyString())).thenReturn(true);
+        when(cpfValidationPort.isAbleToVote(cpf)).thenReturn(true);
+
+        // WHEN
         pautaService.receberVoto(pautaId, voto);
 
+        // THEN
         ArgumentCaptor<Voto> votoCaptor = ArgumentCaptor.forClass(Voto.class);
         verify(votoRepository).salvar(votoCaptor.capture());
 
-        assertEquals("12345678901", votoCaptor.getValue().getAssociadoId());
+        assertEquals(cpf, votoCaptor.getValue().getAssociadoId());
         assertEquals(pautaId, votoCaptor.getValue().getPautaId());
+
+        // Verifica se a métrica foi chamada
+        verify(meterRegistry).counter(anyString(), any(String[].class));
     }
 
     @Test
-    void deveLancarExcecaoAoVotarDuasVezes() {
-        // Arrange
+    void deveLancarExcecaoAoVotarEmPautaSemSessao() {
         Long pautaId = 1L;
         Voto voto = new Voto(null, pautaId, "12345678901", EscolhaVoto.SIM);
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-        Sessao sessaoAtiva = new Sessao(1L, pautaId, LocalDateTime.now().minusMinutes(1),
-                LocalDateTime.now().plusMinutes(10));
-
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAtiva));
-        when(cpfValidationPort.isAbleToVote(anyString())).thenReturn(true);
-        when(votoRepository.existeVotoPorPautaEAssociado(pautaId, "12345678901")).thenReturn(true);
-
-        // Act & Assert
+        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.empty());
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> pautaService.receberVoto(pautaId, voto));
 
-        assertEquals("Associado já votou nesta pauta", exception.getMessage());
+        assertEquals("Sessão não encontrada para esta pauta", exception.getMessage());
         verify(votoRepository, never()).salvar(any());
     }
 
@@ -207,34 +206,18 @@ class PautaServiceTest {
     void deveLancarExcecaoAoVotarEmSessaoExpirada() {
         Long pautaId = 1L;
         Voto voto = new Voto(null, pautaId, "12345678901", EscolhaVoto.SIM);
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-        // Sessão expirada
-        Sessao sessaoExpirada = new Sessao(1L, pautaId, LocalDateTime.now().minusMinutes(20),
+
+        // Sessão expirada (encerrada há 10 minutos)
+        Sessao sessaoExpirada = new Sessao(1L, pautaId,
+                LocalDateTime.now().minusMinutes(20),
                 LocalDateTime.now().minusMinutes(10));
 
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
         when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoExpirada));
 
         RuntimeException exception = assertThrows(RuntimeException.class,
                 () -> pautaService.receberVoto(pautaId, voto));
 
         assertEquals("A sessão para esta pauta já está encerrada", exception.getMessage());
-        verify(votoRepository, never()).salvar(any());
-    }
-
-    @Test
-    void deveLancarExcecaoAoVotarEmPautaSemSessao() {
-        Long pautaId = 1L;
-        Voto voto = new Voto(null, pautaId, "12345678901", EscolhaVoto.SIM);
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.empty());
-
-        RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> pautaService.receberVoto(pautaId, voto));
-
-        assertEquals("Sessão não encontrada para esta pauta", exception.getMessage());
         verify(votoRepository, never()).salvar(any());
     }
 
@@ -288,21 +271,18 @@ class PautaServiceTest {
     @Test
     @DisplayName("Deve lançar exceção quando o integrador externo retorna 404 (Inexistente)")
     void deveLancarExcecaoQuandoCpfNaoExisteNaBaseExterna() {
+        // GIVEN
         Long pautaId = 1L;
-        // Usando um CPF que simularemos como não encontrado
-        Voto voto = new Voto(null, pautaId, "00000000000", EscolhaVoto.NAO);
-
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(new Pauta()));
+        String cpf = "00000000000";
+        Voto voto = new Voto(null, pautaId, cpf, EscolhaVoto.NAO);
         when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAberta()));
-
-        when(cpfValidationPort.isAbleToVote("00000000000"))
+        when(cpfValidationPort.isAbleToVote(cpf))
                 .thenThrow(new ResourceNotFoundException("CPF inválido ou não encontrado no sistema de validação."));
-
-        // Verificação
         ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
                 () -> pautaService.receberVoto(pautaId, voto));
 
         assertEquals("CPF inválido ou não encontrado no sistema de validação.", ex.getMessage());
+        verify(votoRepository, never()).salvar(any());
     }
 
     @Test

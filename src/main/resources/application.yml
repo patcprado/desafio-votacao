@@ -19,26 +19,33 @@ spring:
   profiles:
     active: dev # Default para desenvolvimento local
 
+  datasource:
+    hikari:
+      maximum-pool-size: 20 # Bônus 3: Performance em alta concorrência
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
   jpa:
-    open-in-view: false # Boa prática de performance: evita conexões abertas desnecessariamente
+    open-in-view: false # Bônus 3: Evita segurar conexão de banco à toa
     hibernate:
       ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        jdbc.batch_size: 50 # Bônus 2: Melhora performance em inserções em massa
+        jdbc.batch_size: 50 # Performance para inserções em massa
         order_inserts: true
-        
+
   flyway:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
 
 app:
-  external:
-    user-validation:
-      url: https://api.votacao.com
+  integration:
+    user-info:
+      url: "https://user-info.herokuapp.com/users" # URL que o orquestrador usou no Adapter
 
 ---
 # Profile de Desenvolvimento (Postgres Docker)
@@ -61,8 +68,8 @@ spring:
   datasource:
     url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
     username: sa
-    password: 
+    password:
     driver-class-name: org.h2.Driver
   jpa:
     hibernate:
-      ddl-auto: create-drop # Para testes, o H2 pode recriar tudo do zero
+      ddl-auto: create-drop
