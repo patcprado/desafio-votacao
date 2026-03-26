@@ -16,6 +16,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -35,283 +36,175 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PautaServiceTest {
 
-    @Mock
-    private PautaRepositoryPort pautaRepository;
+    @Mock private PautaRepositoryPort pautaRepository;
+    @Mock private SessaoRepositoryPort sessaoRepository;
+    @Mock private VotoRepositoryPort votoRepository;
+    @Mock private CpfValidationPort cpfValidationPort;
+    @Mock private MeterRegistry meterRegistry;
+    @Mock private Counter counter;
 
-    @Mock
-    private SessaoRepositoryPort sessaoRepository;
+    @InjectMocks private PautaService pautaService;
 
-    @Mock
-    private VotoRepositoryPort votoRepository;
+    // Constantes para limpar o código e evitar repetição
+    private static final Long PAUTA_ID = 1L;
+    private static final String CPF_VALIDO = "12345678901";
+    private static final String CPF_LONGO = "12345678901234";
+    private static final String CPF_COM_LETRAS = "12345678e01";
 
-    @InjectMocks
-    private PautaService pautaService;
-
-    @Mock
-    private CpfValidationPort cpfValidationPort;
-    
-    @Mock
-    private MeterRegistry meterRegistry;
-
-    @Mock
-    private Counter counter;
-    
     @BeforeEach
-    public void setup() {
-        // Para os testes que chamam o meterRegistry
+    void setup() {
+        // Mock do Micrometer (Métricas) para não quebrar os testes de sucesso
         lenient().when(meterRegistry.counter(anyString(), any(String[].class))).thenReturn(counter);
     }
 
-    // 1. Ajuste no teste de Pauta Inexistente (Abrir Sessão)
-    @Test
-    @DisplayName("Deve lançar exceção ao abrir sessão para pauta inexistente")
-    public void deveLancarExcecaoAoAbrirSessaoParaPautaInexistente() {
-        Long pautaId = 99L;
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.empty());
+    @Nested
+    @DisplayName("Caminho Feliz: Processamento de Pautas e Votos")
+    class CaminhoFeliz {
 
-        // Mude de RuntimeException para ResourceNotFoundException
-        assertThrows(ResourceNotFoundException.class, () -> pautaService.abrirSessao(pautaId, 10));
-    }
-    // 2. Ajuste no teste de Sessão já Aberta
-    @Test
-    public void deveLancarExcecaoAoAbrirSessaoJaAtiva() {
-        Long pautaId = 1L;
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-        Sessao sessaoAtiva = new Sessao(1L, pautaId, LocalDateTime.now(), LocalDateTime.now().plusMinutes(10));
+        @Test
+        @DisplayName("Deve abrir sessão com tempo padrão (1 min) quando minutos for nulo")
+        void deveAbrirSessaoComTempoDefault() {
+            Pauta pauta = new Pauta(PAUTA_ID, "Título", "Desc");
+            when(pautaRepository.buscarPorId(PAUTA_ID)).thenReturn(Optional.of(pauta));
+            when(sessaoRepository.buscarPorPautaId(PAUTA_ID)).thenReturn(Optional.empty());
 
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAtiva));
+            pautaService.abrirSessao(PAUTA_ID, null);
 
-        // MUDANÇA: Agora esperamos BusinessException
-        BusinessException exception = assertThrows(BusinessException.class,
-                () -> pautaService.abrirSessao(pautaId, 5));
+            ArgumentCaptor<Sessao> sessaoCaptor = ArgumentCaptor.forClass(Sessao.class);
+            verify(sessaoRepository).salvar(sessaoCaptor.capture());
 
-        assertEquals("Já existe uma sessão aberta para esta pauta.", exception.getMessage());
-        verify(sessaoRepository, never()).salvar(any());
-    }
+            assertTrue(sessaoCaptor.getValue().getDataEncerramento().isAfter(LocalDateTime.now()));
+        }
 
-    // 3. Ajuste no teste de Voto (Sessão Fechada)
-    @Test
-    public void deveLancarExcecaoAoVotarEmSessaoExpirada() {
-        Long pautaId = 1L;
-        Voto voto = new Voto(null, pautaId, "12345678901", EscolhaVoto.SIM);
+        @Test
+        @DisplayName("Deve receber voto com sucesso (Valida CPF, Duplicidade e Métricas)")
+        void deveReceberVotoComSucesso() {
+            Voto voto = new Voto(null, PAUTA_ID, CPF_VALIDO, EscolhaVoto.SIM);
 
-        Sessao sessaoExpirada = new Sessao(1L, pautaId,
-                LocalDateTime.now().minusMinutes(20),
-                LocalDateTime.now().minusMinutes(10));
+            // Simula sessão aberta e CPF autorizado
+            when(sessaoRepository.buscarPorPautaId(PAUTA_ID)).thenReturn(Optional.of(criarSessaoAberta()));
+            when(cpfValidationPort.isAbleToVote(CPF_VALIDO)).thenReturn(true);
+            when(votoRepository.existeVotoPorPautaEAssociado(PAUTA_ID, CPF_VALIDO)).thenReturn(false);
 
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoExpirada));
+            pautaService.receberVoto(PAUTA_ID, votogit ArgumentCaptor<Voto> votoCaptor = ArgumentCaptor.forClass(Voto.class);
+            verify(votoRepository).salvar(votoCaptor.capture());
+            assertEquals(CPF_VALIDO, votoCaptor.getValue().getAssociadoId());
 
-        // MUDANÇA: Esperamos BusinessException ou a que você definiu no Service
-        RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> pautaService.receberVoto(pautaId, voto));
+            verify(meterRegistry).counter(anyString(), any(String[].class));
+        }
 
-        assertTrue(exception.getMessage().contains("encerrada"));
-    }
+        @Test
+        @DisplayName("Deve calcular resultado com vitória do SIM")
+        void deveCalcularResultadoComVitoriaSim() {
+            List<Voto> votos = List.of(
+                    new Voto(1L, PAUTA_ID, "A1", EscolhaVoto.SIM),
+                    new Voto(2L, PAUTA_ID, "A2", EscolhaVoto.SIM),
+                    new Voto(3L, PAUTA_ID, "A3", EscolhaVoto.NAO));
 
-    @Test
-    @DisplayName("Deve lançar exceção ao tentar votar duas vezes na mesma pauta")
-    public void deveLancarExcecaoAoVotarDuplicado() {
-        // GIVEN
-        Long pautaId = 1L;
-        String cpf = "12345678901";
-        Voto voto = new Voto(null, pautaId, cpf, EscolhaVoto.SIM);
+            when(pautaRepository.buscarPorId(PAUTA_ID)).thenReturn(Optional.of(new Pauta(PAUTA_ID, "T", "D")));
+            when(votoRepository.buscarVotosPorPauta(PAUTA_ID)).thenReturn(votos);
 
-        // 1. Mock da sessão (OK)
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAberta()));
+            ResultadoPauta resultado = pautaService.obterResultado(PAUTA_ID);
 
-        // 2. O PULO DO GATO: Autorizar o CPF para ele não barrar o teste aqui!
-        when(cpfValidationPort.isAbleToVote(cpf)).thenReturn(true);
-
-        // 3. Mock da duplicidade (Agora com o nome certo da sua Interface!)
-        when(votoRepository.existeVotoPorPautaEAssociado(anyLong(), anyString())).thenReturn(true);
-
-        // WHEN / THEN
-        assertThrows(VotoDuplicadoException.class, () -> {
-            pautaService.receberVoto(pautaId, voto);
-        });
+            assertEquals(2L, resultado.totalSim());
+            assertEquals(1L, resultado.totalNao());
+            assertEquals("SIM", resultado.resultado());
+        }
     }
 
-    @Test
-    public void deveAbrirSessaoComTempoDefault() {
-        Long pautaId = 1L;
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
+    @Nested
+    @DisplayName("Caminho Ruim: Validações de Sessão e Pauta")
+    class CaminhoRuimSessao {
 
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.empty());
+        @Test
+        @DisplayName("Deve falhar ao abrir sessão para pauta inexistente")
+        void deveFalharAbrirSessaoPautaInexistente() {
+            when(pautaRepository.buscarPorId(PAUTA_ID)).thenReturn(Optional.empty());
+            assertThrows(ResourceNotFoundException.class, () -> pautaService.abrirSessao(PAUTA_ID, 10));
+        }
 
-        pautaService.abrirSessao(pautaId, null);
+        @Test
+        @DisplayName("Deve falhar ao tentar abrir sessão que já está ativa")
+        void deveFalharAbrirSessaoJaAtiva() {
+            when(pautaRepository.buscarPorId(PAUTA_ID)).thenReturn(Optional.of(new Pauta(PAUTA_ID, "T", "D")));
+            when(sessaoRepository.buscarPorPautaId(PAUTA_ID)).thenReturn(Optional.of(criarSessaoAberta()));
 
-        ArgumentCaptor<Sessao> sessaoCaptor = ArgumentCaptor.forClass(Sessao.class);
-        verify(sessaoRepository).salvar(sessaoCaptor.capture());
+            BusinessException exception = assertThrows(BusinessException.class,
+                    () -> pautaService.abrirSessao(PAUTA_ID, 5));
 
-        Sessao sessaoSalva = sessaoCaptor.getValue();
-        // Tempo default é 1 minuto
-        assertTrue(sessaoSalva.getDataEncerramento().isAfter(LocalDateTime.now().plusSeconds(50)));
-        assertTrue(sessaoSalva.getDataEncerramento().isBefore(LocalDateTime.now().plusMinutes(1).plusSeconds(10)));
+            assertEquals("Já existe uma sessão aberta para esta pauta.", exception.getMessage());
+        }
     }
 
-    @Test
-    public void deveReceberVotoComSucesso() {
-        // GIVEN
-        Long pautaId = 1L;
-        String cpf = "12345678901";
-        Voto voto = new Voto(null, pautaId, cpf, EscolhaVoto.SIM);
+    @Nested
+    @DisplayName("Caminho Ruim: Validações e Restrições de Voto")
+    class CaminhoRuimVoto {
 
-        // Sessão ativa (Esta chamada ainda existe no Service)
-        Sessao sessaoAtiva = new Sessao(1L, pautaId, LocalDateTime.now().minusMinutes(1),
-                LocalDateTime.now().plusMinutes(10));
+        @Test
+        @DisplayName("Deve rejeitar voto se o CPF já votou (Voto Duplicado: 409 Conflict)")
+        void deveFalharVotoDuplicado() {
+            Voto voto = new Voto(null, PAUTA_ID, CPF_VALIDO, EscolhaVoto.SIM);
 
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAtiva));
-        when(cpfValidationPort.isAbleToVote(cpf)).thenReturn(true);
+            when(sessaoRepository.buscarPorPautaId(PAUTA_ID)).thenReturn(Optional.of(criarSessaoAberta()));
+            when(cpfValidationPort.isAbleToVote(CPF_VALIDO)).thenReturn(true);
+            when(votoRepository.existeVotoPorPautaEAssociado(PAUTA_ID, CPF_VALIDO)).thenReturn(true);
 
-        pautaService.receberVoto(pautaId, voto);
+            assertThrows(VotoDuplicadoException.class, () -> pautaService.receberVoto(PAUTA_ID, voto));
+        }
 
-        ArgumentCaptor<Voto> votoCaptor = ArgumentCaptor.forClass(Voto.class);
-        verify(votoRepository).salvar(votoCaptor.capture());
+        @Test
+        @DisplayName("Deve falhar se o CPF for inválido (Letras ou Tamanho)")
+        void deveFalharCpfComLetras() {
+            Voto voto = new Voto(null, PAUTA_ID, CPF_COM_LETRAS, EscolhaVoto.SIM);
 
-        assertEquals(cpf, votoCaptor.getValue().getAssociadoId());
-        assertEquals(pautaId, votoCaptor.getValue().getPautaId());
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> pautaService.receberVoto(PAUTA_ID, voto));
 
-        // Verifica se a métrica foi chamada
-        verify(meterRegistry).counter(anyString(), any(String[].class));
+            assertEquals("CPF deve conter apenas números", ex.getMessage());
+            verify(cpfValidationPort, never()).isAbleToVote(anyString());
+        }
+
+        @Test
+        @DisplayName("Deve falhar se o serviço externo de CPF retornar 404 (Não Encontrado)")
+        void deveFalharCpfNaoEncontradoExternamente() {
+            Voto voto = new Voto(null, PAUTA_ID, "00000000000", EscolhaVoto.NAO);
+            when(sessaoRepository.buscarPorPautaId(PAUTA_ID)).thenReturn(Optional.of(criarSessaoAberta()));
+            when(cpfValidationPort.isAbleToVote("00000000000"))
+                    .thenThrow(new ResourceNotFoundException("CPF inválido ou não encontrado."));
+
+            assertThrows(ResourceNotFoundException.class, () -> pautaService.receberVoto(PAUTA_ID, voto));
+        }
     }
 
-    @Test
-    public void deveLancarExcecaoAoVotarEmPautaSemSessao() {
-        Long pautaId = 1L;
-        Voto voto = new Voto(null, pautaId, "12345678901", EscolhaVoto.SIM);
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.empty());
-        RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> pautaService.receberVoto(pautaId, voto));
+    @Nested
+    @DisplayName("Caminho Ruim: Resultados Atípicos")
+    class CaminhoRuimResultado {
 
-        assertEquals("Sessão não encontrada para esta pauta", exception.getMessage());
-        verify(votoRepository, never()).salvar(any());
+        @Test
+        @DisplayName("Deve retornar EMPATE quando houver empate técnico (1x1)")
+        void deveRetornarEmpateVotosIguais() {
+            List<Voto> votos = List.of(
+                    new Voto(1L, PAUTA_ID, "A1", EscolhaVoto.SIM),
+                    new Voto(2L, PAUTA_ID, "A2", EscolhaVoto.NAO));
+
+            when(pautaRepository.buscarPorId(PAUTA_ID)).thenReturn(Optional.of(new Pauta(PAUTA_ID, "T", "D")));
+            when(votoRepository.buscarVotosPorPauta(PAUTA_ID)).thenReturn(votos);
+
+            assertEquals("EMPATE", pautaService.obterResultado(PAUTA_ID).resultado());
+        }
+
+        @Test
+        @DisplayName("Deve retornar EMPATE quando a pauta não tiver nenhum voto")
+        void deveRetornarEmpateSemVotos() {
+            when(pautaRepository.buscarPorId(PAUTA_ID)).thenReturn(Optional.of(new Pauta(PAUTA_ID, "T", "D")));
+            when(votoRepository.buscarVotosPorPauta(PAUTA_ID)).thenReturn(Collections.emptyList());
+
+            assertEquals("EMPATE", pautaService.obterResultado(PAUTA_ID).resultado());
+        }
     }
 
-    // 4. Obter Resultado
-    @Test
-    public void deveCalcularResultadoComVitoriaSim() {
-        Long pautaId = 1L;
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-        List<Voto> votos = List.of(
-                new Voto(1L, pautaId, "A1", EscolhaVoto.SIM),
-                new Voto(2L, pautaId, "A2", EscolhaVoto.SIM),
-                new Voto(3L, pautaId, "A3", EscolhaVoto.NAO));
-
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(votoRepository.buscarVotosPorPauta(pautaId)).thenReturn(votos);
-
-        ResultadoPauta resultado = pautaService.obterResultado(pautaId);
-
-        assertEquals(2L, resultado.totalSim());
-        assertEquals(1L, resultado.totalNao());
-        assertEquals(3L, resultado.totalVotos());
-        assertEquals("SIM", resultado.resultado());
-    }
-
-    @Test
-    @DisplayName("Deve falhar quando o CPF tem mais de 11 caracteres")
-    public void deveFalharCpfComTamanhoInvalido() {
-        // Cenário: CPF com 14 dígitos (causa erro de VARCHAR no banco)
-        Voto votoLongo = new Voto(null, 1L, "12345678901234", EscolhaVoto.SIM);
-        assertThrows(RuntimeException.class, () -> pautaService.receberVoto(1L, votoLongo));
-    }
-
-    @Test
-    @DisplayName("Deve falhar quando o CPF contém letras")
-    public void deveFalharCpfComLetras() {
-        Long pautaId = 1L;
-        Voto votoComLetras = new Voto(null, pautaId, "12345678e01", EscolhaVoto.SIM);
-
-        RuntimeException ex = assertThrows(RuntimeException.class,
-                () -> pautaService.receberVoto(pautaId, votoComLetras));
-
-        assertEquals("CPF deve conter apenas números", ex.getMessage());
-
-        verify(cpfValidationPort, never()).isAbleToVote(anyString());
-    }
-
-    @Test
-    @DisplayName("Deve lançar exceção quando o integrador externo retorna 404 (Inexistente)")
-    public void deveLancarExcecaoQuandoCpfNaoExisteNaBaseExterna() {
-        // GIVEN
-        Long pautaId = 1L;
-        String cpf = "00000000000";
-        Voto voto = new Voto(null, pautaId, cpf, EscolhaVoto.NAO);
-        when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAberta()));
-        when(cpfValidationPort.isAbleToVote(cpf))
-                .thenThrow(new ResourceNotFoundException("CPF inválido ou não encontrado no sistema de validação."));
-        ResourceNotFoundException ex = assertThrows(ResourceNotFoundException.class,
-                () -> pautaService.receberVoto(pautaId, voto));
-
-        assertEquals("CPF inválido ou não encontrado no sistema de validação.", ex.getMessage());
-        verify(votoRepository, never()).salvar(any());
-    }
-
-    @Test
-    public void deveCalcularResultadoComEmpate() {
-        Long pautaId = 1L;
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-        List<Voto> votos = List.of(
-                new Voto(1L, pautaId, "A1", EscolhaVoto.SIM),
-                new Voto(2L, pautaId, "A2", EscolhaVoto.NAO));
-
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(votoRepository.buscarVotosPorPauta(pautaId)).thenReturn(votos);
-
-        ResultadoPauta resultado = pautaService.obterResultado(pautaId);
-
-        assertEquals(1L, resultado.totalSim());
-        assertEquals(1L, resultado.totalNao());
-        assertEquals(2L, resultado.totalVotos());
-        assertEquals("EMPATE", resultado.resultado());
-    }
-
-    @Test
-    public void deveCalcularResultadoSemVotos() {
-        Long pautaId = 1L;
-        Pauta pauta = new Pauta(pautaId, "Título", "Desc");
-
-        when(pautaRepository.buscarPorId(pautaId)).thenReturn(Optional.of(pauta));
-        when(votoRepository.buscarVotosPorPauta(pautaId)).thenReturn(Collections.emptyList());
-
-        ResultadoPauta resultado = pautaService.obterResultado(pautaId);
-
-        assertEquals(0L, resultado.totalSim());
-        assertEquals(0L, resultado.totalNao());
-        assertEquals(0L, resultado.totalVotos());
-        assertEquals("EMPATE", resultado.resultado());
-    }
-
-    // 5. Listagem
-    @Test
-    public void deveListarPautasVazias() {
-        when(pautaRepository.listarTodas()).thenReturn(Collections.emptyList());
-
-        List<Pauta> pautas = pautaService.listarPautas();
-
-        assertTrue(pautas.isEmpty());
-    }
-
-    @Test
-    public void deveListarTodasAsPautas() {
-        List<Pauta> mockPautas = List.of(
-                new Pauta(1L, "Pauta 1", "Desc 1"),
-                new Pauta(2L, "Pauta 2", "Desc 2"));
-        when(pautaRepository.listarTodas()).thenReturn(mockPautas);
-
-        List<Pauta> pautas = pautaService.listarPautas();
-
-        assertEquals(2, pautas.size());
-    }
-
-    private Sessao sessaoAberta() {
-        return new Sessao(
-                1L,
-                1L,
-                LocalDateTime.now().minusMinutes(1), // Iniciou há 1 min
-                LocalDateTime.now().plusMinutes(10)  // Termina em 10 min
-        );
+    // Método auxiliar para criar uma sessão válida
+    private Sessao criarSessaoAberta() {
+        return new Sessao(1L, PAUTA_ID, LocalDateTime.now().minusMinutes(1), LocalDateTime.now().plusMinutes(10));
     }
 }

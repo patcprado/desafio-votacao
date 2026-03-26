@@ -35,26 +35,20 @@ A API utiliza o **SpringDoc OpenAPI 3** para gerar documentação interativa.
 | **Votos** | `POST` | `/pautas/{id}/votos` | Registrar um voto (Valida duplicidade e CPF) |
 | **Resultado** | `GET` | `/pautas/{id}/resultado` | Contabilização final dos votos |
 | **Auditoria** | `GET` | `/pautas/sessoes` | Status das sessões (Debug/Auditoria) |
-
-## 🧪 Estratégia de Testes e Resiliência
-O projeto foca em três pilares de validação:
-* **Testes Unitários:** Cobertura de regras de negócio, garantindo que o `votoRepository` identifique duplicidade e lance `VotoDuplicadoException`.
-* **Tratamento de Erros:** Mapeamento de exceções para retornos HTTP semânticos (ex: `409 Conflict` para votos duplicados).
-* **Seed Dinâmico:** Mecanismo que popula automaticamente 100 votos ao abrir uma sessão para validar performance e algoritmos de soma.
-
+---
 ## 🛠️ Tecnologias Utilizadas
 * **Linguagem:** Java 21 + Spring Boot 3.
 * **Persistência:** PostgreSQL (Produção) e H2 (Testes).
 * **Migrations:** Flyway para versionamento de schema.
 * **Monitoramento:** Spring Boot Actuator (Health Checks e Métricas).
 * **Containers:** Docker & Docker Compose.
-
+---
 ## 🐳 Gerenciamento do Ambiente (Docker)
 1. **Subir o ambiente:** `docker-compose up -d`
 2. **Consultar Logs:** `docker logs -f votacao-api`
 3. **Encerrar o ambiente:** `docker-compose down`
 
-
+---
 
 ## 📊 Observabilidade (Spring Boot Actuator)
 
