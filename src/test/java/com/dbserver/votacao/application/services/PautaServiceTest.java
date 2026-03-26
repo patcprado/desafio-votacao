@@ -86,7 +86,8 @@ class PautaServiceTest {
             when(cpfValidationPort.isAbleToVote(CPF_VALIDO)).thenReturn(true);
             when(votoRepository.existeVotoPorPautaEAssociado(PAUTA_ID, CPF_VALIDO)).thenReturn(false);
 
-            pautaService.receberVoto(PAUTA_ID, votogit ArgumentCaptor<Voto> votoCaptor = ArgumentCaptor.forClass(Voto.class);
+            pautaService.receberVoto(PAUTA_ID, voto);
+            ArgumentCaptor<Voto> votoCaptor = ArgumentCaptor.forClass(Voto.class);
             verify(votoRepository).salvar(votoCaptor.capture());
             assertEquals(CPF_VALIDO, votoCaptor.getValue().getAssociadoId());
 
