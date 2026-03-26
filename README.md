@@ -2,78 +2,59 @@
 
 Este repositório contém uma solução robusta e escalável para o gerenciamento de sessões de votação em assembleias cooperativas, desenvolvida como parte do desafio técnico da DBServer.
 
----
-
 ## 🏗️ Arquitetura e Decisões Técnicas
-
 A aplicação foi construída utilizando **Arquitetura Hexagonal (Ports and Adapters)**. Esta escolha estratégica visa:
-
-* **Independência de Framework:** O "Core" da aplicação (Regras de Negócio) é isolado, facilitando manutenções e trocas de tecnologias de infraestrutura.
+* **Independência de Framework:** O "Core" da aplicação (Regras de Negócio) é isolado de detalhes de infraestrutura.
 * **Domínio Rico:** As regras de validação de votos e sessões estão centralizadas no domínio, seguindo os princípios **SOLID**.
-* **Testabilidade:** A separação clara permite testes unitários de alta performance e testes de integração focados.
+* **Testabilidade:** A separação clara permite testes unitários de alta performance e mocks precisos com Mockito.
 
----
-
-## 🎨 Protótipo e Design de API (Figma)
-
-Antes da implementação, a solução foi desenhada no Figma focando na **Experiência do Desenvolvedor (DX)** e na clareza dos fluxos de dados.
+## 🎨 Protótipo e Design de API (Google Stitch)
+Antes da implementação, a solução foi desenhada utilizando o **Google Stitch**, focando na **Experiência do Desenvolvedor (DX)** e na clareza dos fluxos de dados.
 
 | 1. Cadastro de Pauta | 2. Votação | 3. Resultado Final |
 |---|---|---|
 | ![Cadastro](src/main/resources/static/assets/Figma-cadastro-pauta.JPG) | ![Voto](src/main/resources/static/assets/Figma-voto.JPG) | ![Resultado](src/main/resources/static/assets/Figma-resultado.JPG) |
-
-> **Nota sobre DX:** O design foi prototipado para garantir que os contratos REST fossem intuitivos e seguissem as melhores práticas, facilitando o consumo por qualquer front-end ou dispositivo mobile.
-
----
+* **Nota sobre DX:** O design foi prototipado para garantir que os contratos REST fossem intuitivos, facilitando o consumo por qualquer front-end ou dispositivo mobile.
 
 ## 📖 Documentação da API (Swagger)
+A API utiliza o **SpringDoc OpenAPI 3** para gerar documentação interativa.
+* **Acesse aqui:** [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+* **Destaque:** Interface personalizada com descrições de operações (`@Operation`) e modelos de erro (`ErrorDetails`) detalhados.
 
-A API utiliza o **SpringDoc OpenAPI** para gerar documentação interativa.
-
-🔗 **Acesse aqui:** [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+![Interface do Swagger UI personalizado para o Desafio Votação](src/main/resources/static/assets/Swagger.JPG)
 
 ---
+
+## 📖 Endpoints Principais (Base URL: `/v1`)
+
+| Recurso | Método | Endpoint | Descrição |
+| :--- | :--- | :--- | :--- |
+| **Pautas** | `POST` | `/pautas` | Criar uma nova pauta |
+| **Pautas** | `GET` | `/pautas` | Listar todas as pautas |
+| **Sessões** | `POST` | `/pautas/{id}/sessao` | Abrir votação para uma pauta |
+| **Votos** | `POST` | `/pautas/{id}/votos` | Registrar um voto (Valida duplicidade e CPF) |
+| **Resultado** | `GET` | `/pautas/{id}/resultado` | Contabilização final dos votos |
+| **Auditoria** | `GET` | `/pautas/sessoes` | Status das sessões (Debug/Auditoria) |
+
+## 🧪 Estratégia de Testes e Resiliência
+O projeto foca em três pilares de validação:
+* **Testes Unitários:** Cobertura de regras de negócio, garantindo que o `votoRepository` identifique duplicidade e lance `VotoDuplicadoException`.
+* **Tratamento de Erros:** Mapeamento de exceções para retornos HTTP semânticos (ex: `409 Conflict` para votos duplicados).
+* **Seed Dinâmico:** Mecanismo que popula automaticamente 100 votos ao abrir uma sessão para validar performance e algoritmos de soma.
+
 ## 🛠️ Tecnologias Utilizadas
-O projeto foi desenvolvido com tecnologias modernas para garantir performance, facilidade de deploy e documentação automatizada:
-
-* **Linguagem & Framework:** Java 21 + Spring Boot 3 (Ecossistema atualizado).
-* **API & Documentação:** RESTful API com **Swagger/OpenAPI (SpringDoc)** para contratos claros e testáveis.
-* **Persistência de Dados:**
-    * **Desenvolvimento/Testes:** H2 (In-memory) com profiles dedicados para agilidade.
-    * **Produção/Homologação:** PostgreSQL para resiliência e integridade.
-    * **Versionamento:** Flyway (Migrations) para controle histórico do schema.
-* **Infraestrutura & Deploy:** **Docker & Docker Compose** para orquestração de containers (API + Banco de Dados).
-* **Gestão de Dependências:** Maven.
-* **Spring Data JPA** (Persistência com H2 em memória)
-* **Bean Validation** (Validação de contratos)
-
----
+* **Linguagem:** Java 21 + Spring Boot 3.
+* **Persistência:** PostgreSQL (Produção) e H2 (Testes).
+* **Migrations:** Flyway para versionamento de schema.
+* **Monitoramento:** Spring Boot Actuator (Health Checks e Métricas).
+* **Containers:** Docker & Docker Compose.
 
 ## 🐳 Gerenciamento do Ambiente (Docker)
+1. **Subir o ambiente:** `docker-compose up -d`
+2. **Consultar Logs:** `docker logs -f votacao-api`
+3. **Encerrar o ambiente:** `docker-compose down`
 
-A aplicação e o banco de dados estão conteinerizados. Utilize os comandos abaixo para gerenciar o ciclo de vida dos containers:
 
-### 1. Subir o ambiente
-Para subir a API (`votacao-api`) e o banco de dados (`votacao-db`) em segundo plano:
-
-docker-compose up -d
-
-### 2. Verificar o status
-Para garantir que os containers estão rodando corretamente e verificar as portas:
-
-docker ps
-
-### 3. Encerrar o ambiente
-Para parar os serviços e remover as redes criadas pelo Compose:
-
-docker-compose down
-
-### 4. Consultar Logs
-Caso precise validar a inicialização do Spring ou do Postgres:
-
-docker logs -f votacao-api
-
----
 
 ## 📊 Observabilidade (Spring Boot Actuator)
 
@@ -118,42 +99,12 @@ A aplicação está configurada para conectar-se ao PostgreSQL via Docker. Caso 
     ```
 ---
 
-## 📖 Endpoints Principais (Base URL)
+## 🧪 Estratégia de Testes e Resiliência
+O projeto foca em três pilares de validação para garantir a integridade e performance:
 
-Caso prefira utilizar ferramentas como **Postman**, **Insomnia** ou **cURL**, a base URL da aplicação é:
-`http://localhost:8080/v1`
-
-### Resumo de Chamadas:
-* **Pautas:** `POST /pautas` (Criar) | `GET /pautas` (Listar)
-* **Sessões:** `POST /pautas/{id}/abrir` (Abrir votação)
-* **Votos:** `POST /pautas/{id}/votos` (Registrar voto)
-* **Resultado:** `GET /pautas/{id}/resultado` (Contabilização)
-
----
-
-## 🧪 Estratégia de Testes e Stress
-
-O projeto foca em três pilares de validação para garantir a resiliência:
-
-1. **Carga Dinâmica:** Através do gatilho automático de 100 votos por sessão.
-2. **Idempotência:** Bloqueio rigoroso de votos duplicados (`400 Bad Request`).
-3. **Concorrência:** Testado via script Shell para garantir suporte a múltiplas requisições simultâneas.
-
-### Executando o Script de Stress
-O repositório inclui o `teste_stress.sh`, que automatiza o fluxo de criação, abertura e injeta mais **50 votos simultâneos**.
-
-chmod +x teste_stress.sh
-
-./teste_stress.sh
-
----
-
-## ⚡ Gatilho de Carga Automática (Seed Dinâmico)
-
-Diferente de um *seed* estático, a aplicação possui um mecanismo de **indução de carga sob demanda**:
-
-* **O Gatilho:** Ao criar uma nova Pauta e abrir sua respectiva Sessão, o sistema automaticamente popula essa sessão com **100 votos iniciais**.
-* **O Motivo:** Permitir que o avaliador valide imediatamente os algoritmos de contabilização e performance dos endpoints de `/resultado`, sem a necessidade de realizar 100 chamadas manuais.
+* **Testes Unitários:** Cobertura de regras de negócio, garantindo que o `votoRepository` identifique duplicidade e lance `VotoDuplicadoException` (Retorno `409 Conflict`).
+* **Seed Dinâmico (Carga Automática):** Ao abrir uma sessão, o sistema popula automaticamente **100 votos iniciais**. Isso permite validar instantaneamente os algoritmos de contabilização sem 100 chamadas manuais.
+* **Teste de Stress (Concorrência):** O repositório inclui o `teste_stress.sh`, que automatiza a criação de pauta e injeta **50 votos simultâneos** via script para validar o suporte a múltiplas requisições.
 
 ---
 

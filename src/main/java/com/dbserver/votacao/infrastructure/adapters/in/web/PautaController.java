@@ -6,7 +6,10 @@ import com.dbserver.votacao.domain.model.ResultadoPauta;
 import com.dbserver.votacao.domain.model.Sessao;
 import com.dbserver.votacao.domain.service.VotacaoService;
 import com.dbserver.votacao.infrastructure.adapters.in.web.dto.PautaRequest;
+import com.dbserver.votacao.infrastructure.adapters.in.web.dto.SessaoResponse;
 import com.dbserver.votacao.infrastructure.adapters.in.web.dto.VotoRequest;
+import com.dbserver.votacao.infrastructure.adapters.in.web.dto.VotoResponse;
+import com.dbserver.votacao.infrastructure.adapters.in.web.exception.GlobalExceptionHandler;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.GlobalExceptionHandler.ErrorDetails;
 import com.dbserver.votacao.infrastructure.adapters.out.persistence.SessaoPersistenceAdapter;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,31 +60,37 @@ public class PautaController {
 
     @Operation(summary = "Registrar um voto", description = "Recebe o voto (SIM/NAO) de um associado para uma pauta com sessão aberta.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Voto computado com sucesso", content = @Content),
-            @ApiResponse(responseCode = "400", description = "Regra de negócio violada", content = @Content(schema = @Schema(implementation = ErrorDetails.class))),
-            @ApiResponse(responseCode = "404", description = "Pauta inexistente", content = @Content(schema = @Schema(implementation = ErrorDetails.class)))
+            @ApiResponse(responseCode = "201", description = "Voto computado com sucesso",
+                    content = @Content(schema = @Schema(implementation = VotoResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Regra de negócio violada",
+                    content = @Content(schema = @Schema(implementation = ErrorDetails.class)))
     })
     @PostMapping("/{id}/votos")
-    public ResponseEntity<Void> votar(
+    public ResponseEntity<VotoResponse> votar(
             @PathVariable Long id,
             @RequestBody @Valid VotoRequest request) {
 
-        // Chamando a lógica que contém a validação de CPF e Performance
-        votacaoService.registrarVoto(id, request.associadoId(), request.escolha());
+        // Agora o serviço retorna os dados do processamento
+        VotoResponse response = votacaoService.registrarVoto(id, request.associadoId(), request.escolha());
 
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "Abrir sessão de votação")
+    @Operation(summary = "Abrir sessão de votação",
+            description = "Inicia cronômetro para votação de uma pauta.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Sessão aberta com sucesso", content = @Content(schema = @Schema(implementation = String.class)))
+            @ApiResponse(responseCode = "200", description = "Sessão aberta com sucesso"),
+            @ApiResponse(responseCode = "400", description = "Erro de negócio",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorDetails.class))),
+            @ApiResponse(responseCode = "404", description = "Pauta inexistente",
+                    content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorDetails.class)))
     })
-    @PostMapping("/{id}/abrir")
+    @PostMapping("/{pautaId}/sessao") // <-- Sua nova rota escolhida!
     public ResponseEntity<String> abrirSessao(
-            @Parameter(description = "ID da pauta") @PathVariable Long id,
-            @Parameter(description = "Duração em minutos (padrão é 1)") @RequestParam(defaultValue = "1") Integer minutos) {
+            @PathVariable Long pautaId,
+            @RequestParam(defaultValue = "1") Integer minutos) {
 
-        pautaService.abrirSessao(id, minutos);
+        pautaService.abrirSessao(pautaId, minutos);
         return ResponseEntity.ok("Sessão aberta com sucesso por " + minutos + " minutos.");
     }
 
@@ -101,8 +110,17 @@ public class PautaController {
             @ApiResponse(responseCode = "200", description = "Lista de sessões obtida com sucesso")
     })
     @GetMapping("/sessoes")
-    public ResponseEntity<List<Sessao>> listarSessoes() {
-        return ResponseEntity.ok(sessionAdapter.listarTodas());
+    public ResponseEntity<List<SessaoResponse>> listarSessoes() {
+        List<SessaoResponse> response = sessionAdapter.listarTodas().stream()
+                .map(s -> new SessaoResponse(
+                        s.getId(),
+                        s.getPautaId(),
+                        s.getDataAbertura(),
+                        s.getDataEncerramento(),
+                        s.estaAberta()
+                ))
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
 }

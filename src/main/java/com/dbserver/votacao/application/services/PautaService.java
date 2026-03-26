@@ -3,8 +3,11 @@ package com.dbserver.votacao.application.services;
 import com.dbserver.votacao.application.ports.out.PautaRepositoryPort;
 import com.dbserver.votacao.application.ports.out.SessaoRepositoryPort;
 import com.dbserver.votacao.application.ports.out.VotoRepositoryPort;
+import com.dbserver.votacao.domain.exception.BusinessException;
 import com.dbserver.votacao.domain.model.*;
 import com.dbserver.votacao.application.ports.out.CpfValidationPort;
+import com.dbserver.votacao.infrastructure.adapters.in.web.exception.ResourceNotFoundException;
+import com.dbserver.votacao.infrastructure.adapters.in.web.exception.VotoDuplicadoException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,12 +43,14 @@ public class PautaService {
     public void abrirSessao(Long pautaId, Integer minutos) {
         log.info("M=abrirSessao, status=START, pautaId={}", pautaId);
 
+        // 1. Troque RuntimeException por ResourceNotFoundException (Gera 404 no seu Handler)
         pautaRepository.buscarPorId(pautaId)
-                .orElseThrow(() -> new RuntimeException("Pauta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Pauta com ID " + pautaId + " não encontrada."));
 
+        // 2. Troque RuntimeException por BusinessException ou VotoDuplicadoException (Gera 400 ou 409)
         sessaoRepository.buscarPorPautaId(pautaId).ifPresent(sessao -> {
             if (sessao.estaAberta()) {
-                throw new RuntimeException("Sessão já está aberta para esta pauta");
+                throw new BusinessException("Já existe uma sessão aberta para esta pauta.");
             }
         });
 
@@ -78,6 +83,10 @@ public class PautaService {
         // 3. Validação Externa (CPF Inapto)
         if (!cpfValidationPort.isAbleToVote(cpfLimpo)) {
             throw new RuntimeException("Associado não autorizado para votar (CPF inválido ou inapto)");
+        }
+
+        if (votoRepository.existeVotoPorPautaEAssociado(pautaId, voto.getAssociadoId())) {
+            throw new VotoDuplicadoException(voto.getAssociadoId(), pautaId);
         }
 
         // 4. Salvar Voto (A Unique Constraint no banco garante a unicidade aqui)

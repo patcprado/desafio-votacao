@@ -7,13 +7,16 @@ import jakarta.validation.constraints.Size;
 
 public record VotoRequest(
         @NotBlank(message = "O ID do associado (CPF) é obrigatório")
-        @Size(min = 11, max = 11, message = "O CPF deve ter exatamente 11 dígitos")
-        @Pattern(regexp = "\\d{11}", message = "O CPF deve conter apenas números")
+        @Pattern(
+                regexp = "(^\\d{11}$|^\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}$)",
+                message = "O CPF deve ter 11 dígitos ou o formato 000.000.000-00"
+        )
         @Schema(description = "ID único do associado (CPF)", example = "12345678901")
         String associadoId,
 
         @NotBlank(message = "A escolha do voto (SIM/NAO) é obrigatória")
+        @Pattern(regexp = "^(?i)(SIM|NAO)$", message = "A escolha deve ser apenas SIM ou NAO")
         @Schema(description = "Escolha do voto (SIM ou NAO)", example = "SIM", allowableValues = {"SIM", "NAO"})
         String escolha
-) {
+        ) {
 }

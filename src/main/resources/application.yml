@@ -1,8 +1,9 @@
 logging:
   level:
     com.dbserver.votacao: INFO
-    org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: DEBUG # Isso mostra o SQL limpo
+    org.hibernate.orm.results: INFO # Volte para INFO para sumir com aqueles gráficos gigantes
+    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping: TRACE # DEBUG Isso vai mostrar os MAPS
 
 management:
   endpoints:
@@ -16,25 +17,30 @@ management:
       enabled: true
 
 spring:
+  mvc:
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false
   profiles:
-    active: dev # Default para desenvolvimento local
+    active: dev
 
   datasource:
     hikari:
-      maximum-pool-size: 20 # Bônus 3: Performance em alta concorrência
+      maximum-pool-size: 20
       minimum-idle: 5
       idle-timeout: 300000
       connection-timeout: 20000
 
   jpa:
-    open-in-view: false # Bônus 3: Evita segurar conexão de banco à toa
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        jdbc.batch_size: 50 # Performance para inserções em massa
+        jdbc.batch_size: 50
         order_inserts: true
 
   flyway:
@@ -45,7 +51,7 @@ spring:
 app:
   integration:
     user-info:
-      url: "https://user-info.herokuapp.com/users" # URL que o orquestrador usou no Adapter
+      url: "https://user-info.herokuapp.com/users"
 
 ---
 # Profile de Desenvolvimento (Postgres Docker)
@@ -54,7 +60,7 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/votacao_db
+    url: jdbc:postgresql://localhost:5432/db_votacao
     username: admin
     password: admin
     driver-class-name: org.postgresql.Driver

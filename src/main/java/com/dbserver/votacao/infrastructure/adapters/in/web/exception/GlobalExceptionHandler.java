@@ -1,80 +1,86 @@
 package com.dbserver.votacao.infrastructure.adapters.in.web.exception;
 
 import com.dbserver.votacao.domain.exception.BusinessException;
-import com.dbserver.votacao.domain.exception.CpfInaptoException;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.List;
+
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // 1 & 2: Record com data formatada e tratamento centralizado
+    public record ErrorDetails(
+            @Schema(description = "Título amigável do erro") String titulo,
+            @Schema(description = "Detalhes da exceção") String detalhe,
+            @Schema(description = "Data e hora do erro")
+            @JsonFormat(pattern = "dd/MM/yyyy HH:mm:ss") LocalDateTime timestamp) {
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorDetails> handleNotFoundException(ResourceNotFoundException ex) {
         log.warn("RECURSO NÃO ENCONTRADO: {}", ex.getMessage());
-        return new ResponseEntity<>(new ErrorDetails("Recurso não encontrado", ex.getMessage(), LocalDateTime.now()), HttpStatus.NOT_FOUND);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorDetails("Recurso não encontrado", ex.getMessage(), LocalDateTime.now()));
     }
 
-    // UNIFICADO: Apenas um método para tratar violação de integridade (Voto Duplicado)
-    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorDetails> handleConflictException(org.springframework.dao.DataIntegrityViolationException ex) {
-        log.warn("CONFLITO DE DADOS (CONSTRAINT): {}", ex.getMessage());
-
-        String titulo = "Erro de Integridade";
-        String mensagem = "Operação não permitida: os dados já existem ou violam regras de integridade.";
+    @ExceptionHandler({BusinessException.class, VotoDuplicadoException.class})
+    public ResponseEntity<ErrorDetails> handleBusinessErrors(RuntimeException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
+        String titulo = "Violação de Regra";
 
-        // Regra específica para o Voto Único
-        if (ex.getMessage() != null && ex.getMessage().contains("uk_pauta_associado")) {
-            titulo = "Conflito de Dados";
-            mensagem = "Voto já registrado: este associado já votou nesta pauta.";
+        if (ex instanceof VotoDuplicadoException) {
+            log.warn("CONFLITO DE VOTO: {}", ex.getMessage());
             status = HttpStatus.CONFLICT;
+            titulo = "Conflito de Registro";
+        } else {
+            log.error("ERRO DE NEGÓCIO: {}", ex.getMessage());
         }
 
-        return new ResponseEntity<>(new ErrorDetails(titulo, mensagem, LocalDateTime.now()), status);
+        return ResponseEntity.status(status)
+                .body(new ErrorDetails(titulo, ex.getMessage(), LocalDateTime.now()));
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ErrorDetails> handleBusinessException(RuntimeException ex) {
-        log.error("REGRA DE NEGÓCIO VIOLADA: {}", ex.getMessage());
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorDetails> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        List<String> erros = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .toList();
+
+        String mensagemUnificada = String.join(" , ", erros);
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorDetails("Regra de Negócio Violada", ex.getMessage(), LocalDateTime.now()));
+                .body(new ErrorDetails("Dados Inválidos", mensagemUnificada, LocalDateTime.now()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorDetails> handleGeneralException(Exception ex) {
-        log.error("ERRO CRÍTICO NÃO TRATADO: ", ex);
-        return new ResponseEntity<>(new ErrorDetails("Erro Interno", "Erro inesperado.", LocalDateTime.now()), HttpStatus.INTERNAL_SERVER_ERROR);
+        log.error("ERRO CRÍTICO: ", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ErrorDetails("Erro Interno", "Ocorreu um erro inesperado no servidor.", LocalDateTime.now()));
     }
 
-    // ... (Manter handleValidationException e handleHttpMessageNotReadableException como estão)
-
-    public record ErrorDetails(
-            @Schema(description = "Título amigável do erro") String titulo,
-            @Schema(description = "Detalhes da exceção") String detalhe,
-
-            @Schema(description = "Data e hora do erro") LocalDateTime timestamp) {
+    @ExceptionHandler(NoHandlerFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND) // Garante o 404 no nível do protocolo
+    public ResponseEntity<ErrorDetails> handleNoHandlerFound(NoHandlerFoundException ex) {
+        ErrorDetails error = new ErrorDetails(
+                "Recurso não encontrado",
+                "A rota " + ex.getRequestURL() + " não foi encontrada em nossa API.",
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
-
-    @ExceptionHandler(CpfInaptoException.class)
-    public ResponseEntity<Map<String, String>> handleCpfInapto(CpfInaptoException ex) {
-        // Retorna exatamente: { "status": "UNABLE_TO_VOTE" }
-        // O requisito pede 404 para "invalid/unable" no bônus
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("status", ex.getStatus()));
-    }
-
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorDetails> handleBusiness(BusinessException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorDetails("Violação de Regra", ex.getMessage(), LocalDateTime.now()));
-    }
-
 }
