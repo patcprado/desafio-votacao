@@ -1,5 +1,7 @@
 package com.dbserver.votacao.infrastructure.adapters.in.web.exception;
 
+import com.dbserver.votacao.domain.exception.BusinessException;
+import com.dbserver.votacao.domain.exception.CpfInaptoException;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -8,6 +10,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.util.Map;
+
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -55,6 +59,22 @@ public class GlobalExceptionHandler {
     public record ErrorDetails(
             @Schema(description = "Título amigável do erro") String titulo,
             @Schema(description = "Detalhes da exceção") String detalhe,
+
             @Schema(description = "Data e hora do erro") LocalDateTime timestamp) {
     }
+
+    @ExceptionHandler(CpfInaptoException.class)
+    public ResponseEntity<Map<String, String>> handleCpfInapto(CpfInaptoException ex) {
+        // Retorna exatamente: { "status": "UNABLE_TO_VOTE" }
+        // O requisito pede 404 para "invalid/unable" no bônus
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("status", ex.getStatus()));
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorDetails> handleBusiness(BusinessException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorDetails("Violação de Regra", ex.getMessage(), LocalDateTime.now()));
+    }
+
 }

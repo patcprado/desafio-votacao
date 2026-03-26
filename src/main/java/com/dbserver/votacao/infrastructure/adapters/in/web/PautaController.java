@@ -4,7 +4,7 @@ import com.dbserver.votacao.application.services.PautaService;
 import com.dbserver.votacao.domain.model.Pauta;
 import com.dbserver.votacao.domain.model.ResultadoPauta;
 import com.dbserver.votacao.domain.model.Sessao;
-import com.dbserver.votacao.domain.model.Voto;
+import com.dbserver.votacao.domain.service.VotacaoService;
 import com.dbserver.votacao.infrastructure.adapters.in.web.dto.PautaRequest;
 import com.dbserver.votacao.infrastructure.adapters.in.web.dto.VotoRequest;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.GlobalExceptionHandler.ErrorDetails;
@@ -32,7 +32,7 @@ public class PautaController {
 
     private final PautaService pautaService;
     private final SessaoPersistenceAdapter sessionAdapter;
-
+    private final VotacaoService votacaoService;
 
     @Operation(summary = "Criar uma nova pauta", description = "Cadastra uma pauta no sistema para posterior votação.")
     @ApiResponses(value = {
@@ -63,14 +63,12 @@ public class PautaController {
     })
     @PostMapping("/{id}/votos")
     public ResponseEntity<Void> votar(
-            @Parameter(description = "ID da pauta") @PathVariable Long id,
+            @PathVariable Long id,
             @RequestBody @Valid VotoRequest request) {
 
-        Voto voto = new Voto();
-        voto.setAssociadoId(request.associadoId());
-        voto.setEscolha(com.dbserver.votacao.domain.model.EscolhaVoto.valueOf(request.escolha().toUpperCase()));
+        // Chamando a lógica que contém a validação de CPF e Performance
+        votacaoService.registrarVoto(id, request.associadoId(), request.escolha());
 
-        pautaService.receberVoto(id, voto);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 

@@ -169,17 +169,11 @@ class PautaServiceTest {
         Sessao sessaoAtiva = new Sessao(1L, pautaId, LocalDateTime.now().minusMinutes(1),
                 LocalDateTime.now().plusMinutes(10));
 
-        // REMOVIDO: pautaRepository.buscarPorId (o Service não chama mais)
-        // REMOVIDO: votoRepository.existeVotoPorPautaEAssociado (o Service não chama mais)
-
-        // MANTIDO: O Service ainda chama a sessão e a validação de CPF
         when(sessaoRepository.buscarPorPautaId(pautaId)).thenReturn(Optional.of(sessaoAtiva));
         when(cpfValidationPort.isAbleToVote(cpf)).thenReturn(true);
 
-        // WHEN
         pautaService.receberVoto(pautaId, voto);
 
-        // THEN
         ArgumentCaptor<Voto> votoCaptor = ArgumentCaptor.forClass(Voto.class);
         verify(votoRepository).salvar(votoCaptor.capture());
 
@@ -247,10 +241,6 @@ class PautaServiceTest {
     void deveFalharCpfComTamanhoInvalido() {
         // Cenário: CPF com 14 dígitos (causa erro de VARCHAR no banco)
         Voto votoLongo = new Voto(null, 1L, "12345678901234", EscolhaVoto.SIM);
-
-        // Aqui testamos se a Service ou o Validator barram antes do Repository.salvar()
-        // Se você implementou @Size no DTO, o teste de integração pegaria,
-        // mas no unitário validamos a lógica da Service.
         assertThrows(RuntimeException.class, () -> pautaService.receberVoto(1L, votoLongo));
     }
 
