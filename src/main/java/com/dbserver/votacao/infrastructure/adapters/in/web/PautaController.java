@@ -2,6 +2,7 @@ package com.dbserver.votacao.infrastructure.adapters.in.web;
 
 import java.util.List;
 
+import com.dbserver.votacao.infrastructure.adapters.in.web.dto.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,10 +17,6 @@ import com.dbserver.votacao.application.services.PautaService;
 import com.dbserver.votacao.domain.model.Pauta;
 import com.dbserver.votacao.domain.model.ResultadoPauta;
 import com.dbserver.votacao.domain.service.VotacaoService;
-import com.dbserver.votacao.infrastructure.adapters.in.web.dto.PautaRequest;
-import com.dbserver.votacao.infrastructure.adapters.in.web.dto.SessaoResponse;
-import com.dbserver.votacao.infrastructure.adapters.in.web.dto.VotoRequest;
-import com.dbserver.votacao.infrastructure.adapters.in.web.dto.VotoResponse;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.GlobalExceptionHandler;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.GlobalExceptionHandler.ErrorDetails;
 import com.dbserver.votacao.infrastructure.adapters.out.persistence.SessaoPersistenceAdapter;
@@ -46,8 +43,9 @@ public class PautaController {
 
         @Operation(summary = "Criar uma nova pauta", description = "Cadastra uma pauta no sistema para posterior votação.")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "201", description = "Pauta criada com sucesso", content = @Content(schema = @Schema(implementation = Pauta.class))),
-                        @ApiResponse(responseCode = "400", description = "Dados da pauta inválidos", content = @Content(schema = @Schema(implementation = ErrorDetails.class)))
+                @ApiResponse(responseCode = "201", description = "Pauta criada com sucesso"),
+                @ApiResponse(responseCode = "400", description = "Dados da pauta inválidos",
+                        content = @Content(schema = @Schema(implementation = ErrorDetails.class)))
         })
         @PostMapping
         public ResponseEntity<Pauta> criar(@RequestBody @Valid PautaRequest request) {
@@ -83,17 +81,19 @@ public class PautaController {
 
         @Operation(summary = "Abrir sessão de votação", description = "Inicia cronômetro para votação de uma pauta.")
         @ApiResponses(value = {
-                        @ApiResponse(responseCode = "200", description = "Sessão aberta com sucesso"),
-                        @ApiResponse(responseCode = "400", description = "Erro de negócio", content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorDetails.class))),
-                        @ApiResponse(responseCode = "404", description = "Pauta inexistente", content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorDetails.class)))
+                @ApiResponse(responseCode = "200", description = "Sessão aberta com sucesso", content = @Content(schema = @Schema(implementation = MensagemResponse.class))),
+                @ApiResponse(responseCode = "400", description = "Erro de negócio", content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorDetails.class))),
+                @ApiResponse(responseCode = "404", description = "Pauta inexistente", content = @Content(schema = @Schema(implementation = GlobalExceptionHandler.ErrorDetails.class)))
         })
-        @PostMapping("/{pautaId}/sessao") // <-- Sua nova rota escolhida!
-        public ResponseEntity<String> abrirSessao(
-                        @PathVariable Long pautaId,
-                        @RequestParam(defaultValue = "1") Integer minutos) {
+        @PostMapping("/{pautaId}/sessao")
+        public ResponseEntity<MensagemResponse> abrirSessao(
+                @PathVariable Long pautaId,
+                @RequestParam(defaultValue = "1") Integer minutos) {
 
                 pautaService.abrirSessao(pautaId, minutos);
-                return ResponseEntity.ok("Sessão aberta com sucesso por " + minutos + " minutos.");
+
+                String mensagemFormatada = String.format("Sessão aberta com sucesso por %d minutos.", minutos);
+                return ResponseEntity.ok(new MensagemResponse(mensagemFormatada));
         }
 
         @Operation(summary = "Obter resultado da votação")
@@ -101,8 +101,7 @@ public class PautaController {
                         @ApiResponse(responseCode = "200", description = "Resultado obtido com sucesso", content = @Content(schema = @Schema(implementation = ResultadoPauta.class)))
         })
         @GetMapping("/{id}/resultado")
-        public ResponseEntity<ResultadoPauta> obterResultado(
-                        @Parameter(description = "ID da pauta") @PathVariable Long id) {
+        public ResponseEntity<ResultadoPauta> obterResultado(@PathVariable Long id) {
                 return ResponseEntity.ok(pautaService.obterResultado(id));
         }
 

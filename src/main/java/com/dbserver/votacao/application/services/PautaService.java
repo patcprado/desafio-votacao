@@ -121,15 +121,21 @@ public class PautaService {
         return cpf.replaceAll("\\D", "");
     }
 
+    /**
+     * Obtém o resultado consolidado de uma votação.
+     * Implementa a lógica de agregação e proteção contra pautas inexistentes.
+     */
     public ResultadoPauta obterResultado(Long pautaId) {
         log.info("M=obterResultado, status=START, pautaId={}", pautaId);
 
-        // Opcional: Validar se a pauta existe
+        // 1. Fail-fast: Valida se a pauta existe antes de processar
         pautaRepository.buscarPorId(pautaId)
-                .orElseThrow(() -> new RuntimeException("Pauta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada com o ID: " + pautaId));
 
+        // 2. Busca a lista de votos do domínio através da porta de saída
         java.util.List<Voto> votos = votoRepository.buscarVotosPorPauta(pautaId);
 
+        // 3. Agregação dos votos usando Streams (SIM / NAO)
         long totalSim = votos.stream()
                 .filter(v -> v.getEscolha() == EscolhaVoto.SIM)
                 .count();
@@ -138,6 +144,7 @@ public class PautaService {
                 .filter(v -> v.getEscolha() == EscolhaVoto.NAO)
                 .count();
 
+        // 4. Regra de negócio para determinar o vencedor
         String vencedor;
         if (totalSim > totalNao) {
             vencedor = "SIM";
@@ -147,8 +154,9 @@ public class PautaService {
             vencedor = "EMPATE";
         }
 
-        log.info("M=obterResultado, status=SUCCESS, pautaId={}", pautaId);
+        log.info("M=obterResultado, status=SUCCESS, pautaId={}, vencedor={}", pautaId, vencedor);
 
+        // 5. Retorna o DTO de domínio com o resumo da ópera
         return new ResultadoPauta(
                 totalSim,
                 totalNao,

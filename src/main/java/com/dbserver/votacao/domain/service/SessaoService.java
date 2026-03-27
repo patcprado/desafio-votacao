@@ -16,8 +16,15 @@ public class SessaoService {
     private final SessaoJpaRepository sessaoRepository;
 
     public boolean isSessaoAberta(Long pautaId) {
+        log.debug("[SESSÃO] Verificando disponibilidade da pauta: {}", pautaId);
+
         return sessaoRepository.findFirstByPautaIdOrderByIdDesc(pautaId)
-                .map(sessao -> LocalDateTime.now().isBefore(sessao.getDataEncerramento()))
-                .orElseThrow(() -> new ResourceNotFoundException("Nenhuma sessão foi aberta para a pauta: " + pautaId));
+                .map(sessao -> {
+                    boolean ativa = LocalDateTime.now().isBefore(sessao.getDataEncerramento());
+                    log.debug("[SESSÃO] Status pauta {}: {}", pautaId, ativa ? "ABERTA" : "EXPIRADA");
+                    return ativa;
+                })
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Pauta não encontrada ou sem sessão iniciada: " + pautaId));
     }
 }

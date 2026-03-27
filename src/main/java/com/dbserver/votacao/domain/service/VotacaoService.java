@@ -10,6 +10,7 @@ import com.dbserver.votacao.infrastructure.adapters.in.web.exception.VotoDuplica
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -20,26 +21,35 @@ public class VotacaoService {
     private final CpfValidationPort cpfValidationPort;
     private final SessaoService sessaoService;
 
+    @Transactional
     public VotoResponse registrarVoto(Long pautaId, String cpf, String escolha) {
-        log.info("Iniciando registro de voto - Pauta: {}, CPF: {}", pautaId, cpf);
+        log.info("[VOTAÇÃO] Iniciando processamento. Associado: {}, Pauta: {}", cpf, pautaId);
 
         // 1. Regra de Negócio Local (Rápida): A sessão está aberta?
+        log.debug("[VOTAÇÃO] Validando status da sessão. Pauta: {}", pautaId);
         if (!sessaoService.isSessaoAberta(pautaId)) {
+            log.error("[VOTAÇÃO-ERRO] Falha ao registrar voto. Motivo: {}, Contexto: [Assoc: {}, Pauta: {}]",
+                    "Sessão fechada", cpf, pautaId);
             throw new BusinessException("A sessão de votação para esta pauta está fechada.");
         }
 
         // 2. Limpeza do CPF para os próximos passos
         String cpfLimpo = cpf.replaceAll("\\D", "");
+        log.debug("[VOTAÇÃO] CPF sanitizado para consulta: {}", cpfLimpo);
 
         // 3. Integração Externa (Bônus): O CPF está apto para votar?
+        log.debug("[VOTAÇÃO] Validando aptidão do CPF no serviço externo: {}", cpfLimpo);
         if (!cpfValidationPort.isAbleToVote(cpfLimpo)) {
-            log.warn("Tentativa de voto com CPF inapto: {}", cpfLimpo);
+            log.error("[VOTAÇÃO-ERRO] Falha ao registrar voto. Motivo: {}, Contexto: [Assoc: {}, Pauta: {}]",
+                    "CPF inapto", cpfLimpo, pautaId);
             throw new CpfInaptoException("UNABLE_TO_VOTE");
         }
 
         // 4. Consulta ao Banco: Já existe voto?
+        log.debug("[VOTAÇÃO] Verificando duplicidade de voto. Assoc: {}, Pauta: {}", cpfLimpo, pautaId);
         if (votoRepository.existeVotoPorPautaEAssociado(pautaId, cpfLimpo)) {
-            log.warn("Tentativa de voto duplicado detectada - CPF: {} | Pauta: {}", cpfLimpo, pautaId);
+            log.error("[VOTAÇÃO-ERRO] Falha ao registrar voto. Motivo: {}, Contexto: [Assoc: {}, Pauta: {}]",
+                    "Voto duplicado", cpfLimpo, pautaId);
             throw new VotoDuplicadoException(cpfLimpo, pautaId);
         }
 
@@ -51,13 +61,12 @@ public class VotacaoService {
 
         votoRepository.salvar(novoVoto);
 
-        log.info("Voto processado com sucesso para o CPF: {}", cpfLimpo);
+        log.info("[VOTAÇÃO] Voto processado com sucesso. Assoc: {}, Pauta: {}", cpfLimpo, pautaId);
 
         return new VotoResponse(
                 cpfLimpo,
                 "ABLE_TO_VOTE",
                 escolha.toUpperCase(),
-                true
-        );
+                true);
     }
 }
