@@ -1,19 +1,20 @@
 package com.dbserver.votacao.application.services;
 
-import com.dbserver.votacao.application.ports.out.PautaRepositoryPort;
-import com.dbserver.votacao.application.ports.out.SessaoRepositoryPort;
-import com.dbserver.votacao.application.ports.out.VotoRepositoryPort;
-import com.dbserver.votacao.domain.exception.BusinessException;
-import com.dbserver.votacao.domain.model.EscolhaVoto;
-import com.dbserver.votacao.domain.model.Pauta;
-import com.dbserver.votacao.domain.model.ResultadoPauta;
-import com.dbserver.votacao.domain.model.Sessao;
-import com.dbserver.votacao.domain.model.Voto;
-import com.dbserver.votacao.application.ports.out.CpfValidationPort;
-import com.dbserver.votacao.infrastructure.adapters.in.web.exception.VotoDuplicadoException;
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
-import com.dbserver.votacao.infrastructure.adapters.in.web.exception.ResourceNotFoundException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -24,26 +25,40 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import com.dbserver.votacao.application.ports.out.CpfValidationPort;
+import com.dbserver.votacao.application.ports.out.PautaRepositoryPort;
+import com.dbserver.votacao.application.ports.out.SessaoRepositoryPort;
+import com.dbserver.votacao.application.ports.out.VotoRepositoryPort;
+import com.dbserver.votacao.domain.exception.BusinessException;
+import com.dbserver.votacao.domain.model.EscolhaVoto;
+import com.dbserver.votacao.domain.model.Pauta;
+import com.dbserver.votacao.domain.model.ResultadoPauta;
+import com.dbserver.votacao.domain.model.Sessao;
+import com.dbserver.votacao.domain.model.Voto;
+import com.dbserver.votacao.infrastructure.adapters.in.web.exception.ResourceNotFoundException;
+import com.dbserver.votacao.infrastructure.adapters.in.web.exception.VotoDuplicadoException;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 
 @ExtendWith(MockitoExtension.class)
 class PautaServiceTest {
 
-    @Mock private PautaRepositoryPort pautaRepository;
-    @Mock private SessaoRepositoryPort sessaoRepository;
-    @Mock private VotoRepositoryPort votoRepository;
-    @Mock private CpfValidationPort cpfValidationPort;
-    @Mock private MeterRegistry meterRegistry;
-    @Mock private Counter counter;
+    @Mock
+    private PautaRepositoryPort pautaRepository;
+    @Mock
+    private SessaoRepositoryPort sessaoRepository;
+    @Mock
+    private VotoRepositoryPort votoRepository;
+    @Mock
+    private CpfValidationPort cpfValidationPort;
+    @Mock
+    private MeterRegistry meterRegistry;
+    @Mock
+    private Counter counter;
 
-    @InjectMocks private PautaService pautaService;
+    @InjectMocks
+    private PautaService pautaService;
 
     // Constantes para limpar o código e evitar repetição
     private static final Long PAUTA_ID = 1L;

@@ -1,21 +1,27 @@
 package com.dbserver.votacao.application.services;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.dbserver.votacao.application.ports.out.CpfValidationPort;
 import com.dbserver.votacao.application.ports.out.PautaRepositoryPort;
 import com.dbserver.votacao.application.ports.out.SessaoRepositoryPort;
 import com.dbserver.votacao.application.ports.out.VotoRepositoryPort;
 import com.dbserver.votacao.domain.exception.BusinessException;
-import com.dbserver.votacao.domain.model.*;
-import com.dbserver.votacao.application.ports.out.CpfValidationPort;
+import com.dbserver.votacao.domain.model.EscolhaVoto;
+import com.dbserver.votacao.domain.model.Pauta;
+import com.dbserver.votacao.domain.model.ResultadoPauta;
+import com.dbserver.votacao.domain.model.Sessao;
+import com.dbserver.votacao.domain.model.Voto;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.ResourceNotFoundException;
 import com.dbserver.votacao.infrastructure.adapters.in.web.exception.VotoDuplicadoException;
+
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -43,11 +49,13 @@ public class PautaService {
     public void abrirSessao(Long pautaId, Integer minutos) {
         log.info("M=abrirSessao, status=START, pautaId={}", pautaId);
 
-        // 1. Troque RuntimeException por ResourceNotFoundException (Gera 404 no seu Handler)
+        // 1. Troque RuntimeException por ResourceNotFoundException (Gera 404 no seu
+        // Handler)
         pautaRepository.buscarPorId(pautaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pauta com ID " + pautaId + " não encontrada."));
 
-        // 2. Troque RuntimeException por BusinessException ou VotoDuplicadoException (Gera 400 ou 409)
+        // 2. Troque RuntimeException por BusinessException ou VotoDuplicadoException
+        // (Gera 400 ou 409)
         sessaoRepository.buscarPorPautaId(pautaId).ifPresent(sessao -> {
             if (sessao.estaAberta()) {
                 throw new BusinessException("Já existe uma sessão aberta para esta pauta.");
@@ -100,8 +108,8 @@ public class PautaService {
 
     private void incrementarMetricaVoto(Long pautaId, EscolhaVoto escolha) {
         meterRegistry.counter("votacao_votos_total",
-                        "pautaId", pautaId.toString(),
-                        "escolha", escolha.name())
+                "pautaId", pautaId.toString(),
+                "escolha", escolha.name())
                 .increment();
     }
 
@@ -112,7 +120,7 @@ public class PautaService {
         }
         return cpf.replaceAll("\\D", "");
     }
-    
+
     public ResultadoPauta obterResultado(Long pautaId) {
         log.info("M=obterResultado, status=START, pautaId={}", pautaId);
 
