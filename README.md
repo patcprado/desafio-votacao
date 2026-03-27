@@ -115,13 +115,12 @@ A aplicação está configurada para conectar-se ao PostgreSQL via Docker. Caso 
 
 ## 🧪 Estratégia de Testes e Resiliência
 
-O projeto foca em três pilares de validação para garantir a integridade e performance:
+O projeto foca em pilares fundamentais para garantir a integridade e a performance da solução:
 
-* **Testes Unitários:** Cobertura de regras de negócio, garantindo que o `votoRepository` identifique duplicidade e lance `VotoDuplicadoException` (Retorno `409 Conflict`).
-* **Seed Dinâmico (Carga Automática):** Ao abrir uma sessão, o sistema popula automaticamente **100 votos iniciais**. Isso permite validar instantaneamente os algoritmos de contabilização sem 100 chamadas manuais.
-* **Teste de Stress (Concorrência):** O repositório inclui o `teste_stress.sh`, que automatiza a criação de pauta e injeta **50 votos simultâneos** via script para validar o suporte a múltiplas requisições.
-
----
+* **Teste de Stress (Alta Concorrência):** O repositório inclui o script `teste_stress.sh`, que automatiza a criação de pautas e dispara **50 requisições simultâneas em milissegundos**. Este teste é essencial para comprovar a robustez da API sob carga real.
+* **Mecanismo de Proteção:** Utilização de **Lock Pessimista (`PESSIMISTIC_WRITE`)** no nível de banco de dados para mitigar condições de corrida (*Race Conditions*), garantindo que a persistência e contabilização dos votos ocorram de forma atômica.
+* **Resiliência e Timeout:** Foi configurado um `lock.timeout` estratégico, acompanhado pelo mapeamento da `PessimisticLockException` no `GlobalExceptionHandler`. Isso garante que, em cenários de gargalo extremo, o sistema responda com **503 Service Unavailable** (com mensagem amigável), preservando a estabilidade da aplicação e evitando erros genéricos de servidor (500).
+* **Idempotência:** O sistema assegura a unicidade do voto por associado/pauta, retornando **409 Conflict** em tentativas duplicadas, mesmo quando enviadas em paralelo, mantendo a consistência dos dados.
 
 ## ☁️ Estratégia de Cloud (Próximos Passos)
 

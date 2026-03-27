@@ -3,6 +3,7 @@ package com.dbserver.votacao.infrastructure.adapters.in.web.exception;
 import com.dbserver.votacao.domain.exception.BusinessException;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.PessimisticLockException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,15 @@ public class GlobalExceptionHandler {
                 .body(new ErrorDetails("Recurso não encontrado", ex.getMessage(), LocalDateTime.now()));
     }
 
+    @ExceptionHandler(PessimisticLockException.class)
+    public ResponseEntity<ErrorDetails> handleLockException(PessimisticLockException ex) {
+        ErrorDetails error = new ErrorDetails(
+                "Sistema sobrecarregado",
+                "O sistema está muito ocupado no momento. Por favor, tente votar novamente em alguns instantes.",
+                LocalDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error);
+    }
     @ExceptionHandler({BusinessException.class, VotoDuplicadoException.class})
     public ResponseEntity<ErrorDetails> handleBusinessErrors(RuntimeException ex) {
         HttpStatus status = HttpStatus.BAD_REQUEST;

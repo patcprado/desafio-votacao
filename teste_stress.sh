@@ -13,8 +13,7 @@ echo "Pauta criada com ID: $PAUTA_ID"
 # 2. Abrir Sessão
 echo "--------------------------------------"
 echo "Etapa 2: Abrindo sessão para Pauta $PAUTA_ID..."
-curl -X POST "http://localhost:8080/v1/pautas/$PAUTA_ID/abrir?minutos=1" \
-  -H "accept: */*"
+curl -X POST "http://localhost:8080/v1/pautas/$PAUTA_ID/sessao?minutos=1"
 
 sleep 1
 
