@@ -63,7 +63,6 @@ class PautaServiceTest {
     // Constantes para limpar o código e evitar repetição
     private static final Long PAUTA_ID = 1L;
     private static final String CPF_VALIDO = "12345678901";
-    private static final String CPF_LONGO = "12345678901234";
     private static final String CPF_COM_LETRAS = "12345678e01";
 
     @BeforeEach
