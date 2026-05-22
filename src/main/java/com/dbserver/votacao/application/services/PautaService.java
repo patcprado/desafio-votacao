@@ -35,9 +35,9 @@ public class PautaService {
     private final MeterRegistry meterRegistry;
 
     public Pauta criarPauta(Pauta pauta) {
-        log.info("M=criarPauta, status=START, titulo={}", pauta.getTitulo());
+        log.info("[PAUTA] CriarPauta, status=START, titulo={}", pauta.getTitulo());
         pauta = pautaRepository.salvar(pauta);
-        log.info("M=criarPauta, status=SUCCESS, id={}", pauta.getId());
+        log.info("[PAUTA] CriarPauta, status=SUCCESS, id={}", pauta.getId());
         return pauta;
     }
 
@@ -47,18 +47,16 @@ public class PautaService {
 
     @Transactional
     public void abrirSessao(Long pautaId, Integer minutos) {
-        log.info("M=abrirSessao, status=START, pautaId={}", pautaId);
+        log.info("[PAUTA] AbrirSessao, status=START, pautaId={}", pautaId);
 
-        // 1. Troque RuntimeException por ResourceNotFoundException (Gera 404 no seu
-        // Handler)
+
         pautaRepository.buscarPorId(pautaId)
-                .orElseThrow(() -> new ResourceNotFoundException("Pauta com ID " + pautaId + " não encontrada."));
+                .orElseThrow(() -> new ResourceNotFoundException("[PAUTA] Pauta com ID " + pautaId + " não encontrada."));
 
-        // 2. Troque RuntimeException por BusinessException ou VotoDuplicadoException
-        // (Gera 400 ou 409)
+
         sessaoRepository.buscarPorPautaId(pautaId).ifPresent(sessao -> {
             if (sessao.estaAberta()) {
-                throw new BusinessException("Já existe uma sessão aberta para esta pauta.");
+                throw new BusinessException("[PAUTA] Já existe uma sessão aberta para esta pauta.");
             }
         });
 
@@ -70,11 +68,11 @@ public class PautaService {
         novaSessao.setDataEncerramento(LocalDateTime.now().plusMinutes(minutosFinais));
 
         sessaoRepository.salvar(novaSessao);
-        log.info("M=abrirSessao, status=SUCCESS, pautaId={}", pautaId);
+        log.info("[PAUTA] AbrirSessao, status=SUCCESS, pautaId={}", pautaId);
     }
 
     public void receberVoto(Long pautaId, Voto voto) {
-        log.info("M=receberVoto, status=START, pautaId={}, associadoId={}", pautaId, voto.getAssociadoId());
+        log.info("[PAUTA] ReceberVoto, status=START, pautaId={}, associadoId={}", pautaId, voto.getAssociadoId());
 
         // 1. Limpeza e Formatação
         String cpfLimpo = validarELimparCpf(voto.getAssociadoId());
@@ -82,28 +80,28 @@ public class PautaService {
 
         // 2. Validação de Sessão (Regra de Negócio Crítica)
         Sessao sessao = sessaoRepository.buscarPorPautaId(pautaId)
-                .orElseThrow(() -> new RuntimeException("Sessão não encontrada para esta pauta"));
+                .orElseThrow(() -> new RuntimeException("[PAUTA] Sessão não encontrada para esta pauta"));
 
         if (!sessao.estaAberta()) {
-            throw new RuntimeException("A sessão para esta pauta já está encerrada");
+            throw new RuntimeException("[PAUTA] A sessão para esta pauta já está encerrada");
         }
 
         // 3. Validação Externa (CPF Inapto)
         if (!cpfValidationPort.isAbleToVote(cpfLimpo)) {
-            throw new RuntimeException("Associado não autorizado para votar (CPF inválido ou inapto)");
+            throw new RuntimeException("[PAUTA] Associado não autorizado para votar (CPF inválido ou inapto)");
         }
 
         if (votoRepository.existeVotoPorPautaEAssociado(pautaId, voto.getAssociadoId())) {
             throw new VotoDuplicadoException(voto.getAssociadoId(), pautaId);
         }
 
-        // 4. Salvar Voto (A Unique Constraint no banco garante a unicidade aqui)
+        // 4. Salvar Voto
         voto.setPautaId(pautaId);
         votoRepository.salvar(voto);
 
         // 5. Métrica e Log de Sucesso
         incrementarMetricaVoto(pautaId, voto.getEscolha());
-        log.info("M=receberVoto, status=SUCCESS, pautaId={}, associadoId={}", pautaId, cpfLimpo);
+        log.info("[PAUTA] ReceberVoto, status=SUCCESS, pautaId={}, associadoId={}", pautaId, cpfLimpo);
     }
 
     private void incrementarMetricaVoto(Long pautaId, EscolhaVoto escolha) {
@@ -116,21 +114,21 @@ public class PautaService {
     // Método auxiliar para deixar o código principal limpo
     private String validarELimparCpf(String cpf) {
         if (cpf == null || cpf.matches(".*[a-zA-Z].*")) {
-            throw new RuntimeException("CPF deve conter apenas números");
+            throw new RuntimeException("[PAUTA] CPF deve conter apenas números");
         }
         return cpf.replaceAll("\\D", "");
     }
 
     /**
-     * Obtém o resultado consolidado de uma votação.
+     * Obtém o resultado consolidado de uma PAUTA.
      * Implementa a lógica de agregação e proteção contra pautas inexistentes.
      */
     public ResultadoPauta obterResultado(Long pautaId) {
-        log.info("M=obterResultado, status=START, pautaId={}", pautaId);
+        log.info("[PAUTA] ObterResultado, status=START, pautaId={}", pautaId);
 
         // 1. Fail-fast: Valida se a pauta existe antes de processar
         pautaRepository.buscarPorId(pautaId)
-                .orElseThrow(() -> new ResourceNotFoundException("Pauta não encontrada com o ID: " + pautaId));
+                .orElseThrow(() -> new ResourceNotFoundException("[PAUTA] Pauta não encontrada com o ID: " + pautaId));
 
         // 2. Busca a lista de votos do domínio através da porta de saída
         java.util.List<Voto> votos = votoRepository.buscarVotosPorPauta(pautaId);
@@ -154,7 +152,7 @@ public class PautaService {
             vencedor = "EMPATE";
         }
 
-        log.info("M=obterResultado, status=SUCCESS, pautaId={}, vencedor={}", pautaId, vencedor);
+        log.info("[PAUTA] ObterResultado, status=SUCCESS, pautaId={}, vencedor={}", pautaId, vencedor);
 
         // 5. Retorna o DTO de domínio com o resumo da ópera
         return new ResultadoPauta(
